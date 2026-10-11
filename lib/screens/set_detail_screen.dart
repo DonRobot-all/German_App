@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../db.dart';
 import '../models.dart';
+import 'study_screens.dart';
 import 'word_edit_screen.dart';
 
 class SetDetailScreen extends StatefulWidget {
@@ -38,6 +39,14 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
     await _load();
   }
 
+  Future<void> _startStudy() async {
+    final words = _words;
+    if (words == null || words.isEmpty) return;
+    final pool = await AppDb.instance.listAllWords();
+    if (!mounted) return;
+    await showStudySetup(context, words: words, pool: pool);
+  }
+
   Future<bool> _confirmDelete(Word w) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -63,7 +72,20 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
   Widget build(BuildContext context) {
     final words = _words;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.set.name)),
+      appBar: AppBar(
+        title: Text(widget.set.name),
+        actions: [
+          if (words != null && words.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton.tonalIcon(
+                onPressed: _startStudy,
+                icon: const Icon(Icons.school_outlined),
+                label: const Text('Учить'),
+              ),
+            ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openEditor(),
         icon: const Icon(Icons.add),

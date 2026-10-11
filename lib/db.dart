@@ -143,6 +143,19 @@ class AppDb {
     return rows.map(Word.fromMap).toList();
   }
 
+  /// Все слова приложения (из всех наборов, без дублей).
+  /// Нужны, чтобы подбирать неверные варианты ответа в тесте.
+  Future<List<Word>> listAllWords() async {
+    final d = await db;
+    final rows = await d.rawQuery('''
+      SELECT DISTINCT w.* FROM words w
+        JOIN set_words sw ON sw.word_id = w.id
+        JOIN word_sets s ON s.id = sw.set_id
+       WHERE w.deleted = 0 AND sw.deleted = 0 AND s.deleted = 0
+    ''');
+    return rows.map(Word.fromMap).toList();
+  }
+
   /// Создаёт или обновляет слово и привязывает его к набору.
   Future<void> saveWord(Word word, String setId) async {
     final d = await db;
