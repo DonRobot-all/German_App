@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../db.dart';
 import '../models.dart';
+import '../srs.dart';
 import 'set_detail_screen.dart';
+import 'smart_screen.dart';
 
 class SetsScreen extends StatefulWidget {
   const SetsScreen({super.key});
@@ -13,6 +15,8 @@ class SetsScreen extends StatefulWidget {
 
 class _SetsScreenState extends State<SetsScreen> {
   List<WordSet>? _sets;
+  ReviewPlan? _plan;
+  bool _soft = false; // мягкая проверка письма (в строгом режиме false)
 
   @override
   void initState() {
@@ -22,8 +26,85 @@ class _SetsScreenState extends State<SetsScreen> {
 
   Future<void> _load() async {
     final sets = await AppDb.instance.listSets();
+    final plan = await AppDb.instance.buildReviewPlan();
     if (!mounted) return;
-    setState(() => _sets = sets);
+    setState(() {
+      _sets = sets;
+      _plan = plan;
+    });
+  }
+
+  Future<void> _startSmart() async {
+    // План пересобираем в момент нажатия: за время на экране сроки могли наступить.
+    final plan = await AppDb.instance.buildReviewPlan();
+    if (plan.items.isEmpty) {
+      if (mounted) setState(() => _plan = plan);
+      return;
+    }
+    final pool = await AppDb.instance.listAllWords();
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            SmartSessionScreen(items: plan.items, pool: pool, soft: _soft),
+      ),
+    );
+    await _load();
+  }
+
+  Widget _reviewCard(BuildContext context) {
+    final plan = _plan;
+    if (plan == null || plan.wordCount == 0) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final toReview = plan.dueCount + plan.staleCount;
+
+    final lines = <String>[
+      'К повторению: $toReview',
+      if (plan.staleCount > 0) 'из них давно не писали: ${plan.staleCount}',
+      if (plan.newCount > 0) 'Новых слов: ${plan.newCount}',
+    ];
+    final String? waiting = (plan.items.isEmpty && plan.nextDue != null)
+        ? 'Сейчас повторять нечего. Ближайшее повторение: '
+            '${formatWhen(plan.nextDue!, DateTime.now())}'
+        : null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Умное повторение',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Text(lines.join('\n')),
+            if (waiting != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(waiting),
+              ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Мягкая проверка письма'),
+              value: _soft,
+              onChanged: (v) => setState(() => _soft = v),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: plan.items.isEmpty ? null : _startSmart,
+                icon: const Icon(Icons.bolt),
+                label: Text('Повторить сейчас (${plan.items.length})'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _editSet([WordSet? set]) async {
@@ -132,9 +213,10 @@ class _SetsScreenState extends State<SetsScreen> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
-                  itemCount: sets.length,
+                  itemCount: sets.length + 1,
                   itemBuilder: (context, i) {
-                    final s = sets[i];
+                    if (i == 0) return _reviewCard(context);
+                    final s = sets[i - 1];
                     final sub = s.description.isEmpty
                         ? wordsCount(s.wordCount)
                         : '${s.description}\n${wordsCount(s.wordCount)}';

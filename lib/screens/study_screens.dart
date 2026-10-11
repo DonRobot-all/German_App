@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../db.dart';
 import '../models.dart';
 import '../study.dart';
 import 'written_screen.dart';
@@ -249,15 +251,15 @@ class StudyResultView extends StatelessWidget {
     required this.subtitle,
     required this.weakTitle,
     required this.weak,
-    required this.onRepeat,
     required this.onClose,
+    this.onRepeat,
   });
 
   final String headline;
   final String subtitle;
   final String weakTitle;
   final List<Word> weak;
-  final VoidCallback onRepeat;
+  final VoidCallback? onRepeat;
   final VoidCallback onClose;
 
   @override
@@ -290,10 +292,11 @@ class StudyResultView extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 8),
-          FilledButton(
-            onPressed: onRepeat,
-            child: const Text('Повторить эти слова'),
-          ),
+          if (onRepeat != null)
+            FilledButton(
+              onPressed: onRepeat,
+              child: const Text('Повторить эти слова'),
+            ),
         ] else
           Text(
             'Без ошибок!',
@@ -357,6 +360,12 @@ class _QuizScreenState extends State<QuizScreen> {
   void _answer(int i) {
     if (_selected != null) return;
     final q = _questions[_index];
+    unawaited(AppDb.instance.recordAnswer(
+      q.word.id,
+      dirKey(q.direction),
+      correct: i == q.correctIndex,
+      written: false,
+    ));
     setState(() {
       _selected = i;
       if (i == q.correctIndex) {
@@ -602,6 +611,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   }
 
   void _mark(bool known) {
+    final c = _cards[_index];
+    unawaited(AppDb.instance.recordAnswer(
+      c.word.id,
+      dirKey(c.direction),
+      correct: known,
+      written: false,
+    ));
     setState(() {
       if (known) {
         _known++;

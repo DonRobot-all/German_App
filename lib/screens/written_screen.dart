@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 
 import '../checker.dart';
+import '../db.dart';
 import '../models.dart';
 import '../study.dart';
 import 'study_screens.dart';
@@ -84,6 +86,12 @@ class _WrittenScreenState extends State<WrittenScreen> {
           : checkRussian(q.word, _controller.text, soft: widget.soft);
     }
     FocusScope.of(context).unfocus();
+    unawaited(AppDb.instance.recordAnswer(
+      q.word.id,
+      dirKey(q.direction),
+      correct: res.accepted,
+      written: true,
+    ));
     setState(() {
       _result = res;
       if (res.accepted) {

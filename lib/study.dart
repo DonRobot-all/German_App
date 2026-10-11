@@ -32,6 +32,10 @@ QuestionDirection pickDirection(StudyDirection d, Random rnd) {
   }
 }
 
+/// Ключ направления для хранения прогресса.
+String dirKey(QuestionDirection d) =>
+    d == QuestionDirection.ruToDe ? 'ru_de' : 'de_ru';
+
 /// Все варианты перевода: «стол; столик».
 String russianFull(Word w) => w.translations.join('; ');
 
@@ -91,6 +95,28 @@ List<QuizQuestion> buildQuiz({
     ));
   }
   return result;
+}
+
+/// Составляет один вопрос с вариантами ответа по слову [word].
+/// Неверные варианты берутся из [pool]. Если подобрать нечего — null.
+QuizQuestion? buildSingleQuestion({
+  required Word word,
+  required QuestionDirection direction,
+  required List<Word> pool,
+  int optionCount = 4,
+  Random? random,
+}) {
+  final rnd = random ?? Random();
+  final distractors =
+      _pickDistractors(word, direction, pool, pool, rnd, optionCount - 1);
+  if (distractors.isEmpty) return null;
+  final options = <Word>[word, ...distractors]..shuffle(rnd);
+  return QuizQuestion(
+    word: word,
+    direction: direction,
+    options: options,
+    correctIndex: options.indexWhere((o) => o.id == word.id),
+  );
 }
 
 /// Выбирает неверные варианты. Предпочитает слова той же части речи, для

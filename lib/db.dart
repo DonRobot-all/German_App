@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
+import 'srs.dart';
 
 /// Локальная база данных (SQLite).
 ///
@@ -74,6 +75,70 @@ class AppDb {
         updated_at INTEGER NOT NULL,
         PRIMARY KEY(word_id, direction)
       )''');
+  }
+
+  // ---------- Прогресс и повторение ----------
+
+  /// Весь прогресс, ключ — progressKey(слово, направление).
+  Future<Map<String, WordProgress>> loadProgress() async {
+    final d = await db;
+    final rows = await d.query('word_progress');
+    final result = <String, WordProgress>{};
+    for (final r in rows) {
+      final p = WordProgress.fromMap(r);
+      result[progressKey(p.wordId, p.direction)] = p;
+    }
+    return result;
+  }
+
+  /// Записывает ответ пользователя и пересчитывает уровень и срок показа.
+  Future<void> recordAnswer(
+    String wordId,
+    String direction, {
+    required bool correct,
+    required bool written,
+  }) async {
+    final d = await db;
+    final rows = await d.query(
+      'word_progress',
+      where: 'word_id = ? AND direction = ?',
+      whereArgs: [wordId, direction],
+    );
+    final old = rows.isEmpty ? null : WordProgress.fromMap(rows.first);
+    final now = DateTime.now();
+    final updated = applyAnswer(
+      old,
+      wordId: wordId,
+      direction: direction,
+      correct: correct,
+      written: written,
+      now: now,
+    );
+    await d.insert(
+      'word_progress',
+      updated.toMap(now),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Повторный верный письменный ответ внутри сессии после ошибки:
+  /// уровень и срок не меняются, обновляется только «когда писали».
+  Future<void> touchWritten(String wordId, String direction) async {
+    final d = await db;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await d.update(
+      'word_progress',
+      {'last_seen': now, 'last_written': now, 'updated_at': now},
+      where: 'word_id = ? AND direction = ?',
+      whereArgs: [wordId, direction],
+    );
+  }
+
+  /// Собирает очередь «умного повторения» по всем словам приложения.
+  Future<ReviewPlan> buildReviewPlan() async {
+    final words = await listAllWords();
+    final progress = await loadProgress();
+    return buildPlan(words: words, progress: progress, now: DateTime.now());
   }
 
   // ---------- Наборы ----------
@@ -176,6 +241,34 @@ class AppDb {
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+    });
+  }
+
+  /// Добавляет много слов в набор одной транзакцией (импорт).
+  Future<void> addWords(String setId, List<Word> words) async {
+    if (words.isEmpty) return;
+    final d = await db;
+    final now = _now();
+    await d.transaction((txn) async {
+      final batch = txn.batch();
+      for (final w in words) {
+        batch.insert(
+          'words',
+          w.toMap(now),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+        batch.insert(
+          'set_words',
+          {
+            'set_id': setId,
+            'word_id': w.id,
+            'updated_at': now,
+            'deleted': 0,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      await batch.commit(noResult: true);
     });
   }
 

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../db.dart';
 import '../models.dart';
+import '../importer.dart';
+import 'import_screen.dart';
 import 'study_screens.dart';
 import 'word_edit_screen.dart';
 
@@ -37,6 +40,40 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
       ),
     );
     await _load();
+  }
+
+  Future<void> _openImport() async {
+    final added = await Navigator.push<int>(
+      context,
+      MaterialPageRoute<int>(
+        builder: (_) => ImportScreen(setId: widget.set.id),
+      ),
+    );
+    await _load();
+    if (!mounted || added == null || added == 0) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Добавлено: ${wordsCount(added)}')),
+    );
+  }
+
+  Future<void> _export() async {
+    final words = _words;
+    if (words == null || words.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('В наборе пока нет слов')),
+      );
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: exportWords(words)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Скопировано: ${wordsCount(words.length)}. '
+          'Можно вставить в заметки, мессенджер или таблицу.',
+        ),
+      ),
+    );
   }
 
   Future<void> _startStudy() async {
@@ -84,6 +121,16 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                 label: const Text('Учить'),
               ),
             ),
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'import') _openImport();
+              if (v == 'export') _export();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'import', child: Text('Импорт списком')),
+              PopupMenuItem(value: 'export', child: Text('Копировать набор')),
+            ],
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -98,7 +145,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                   child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
-                      'В наборе пока нет слов.\nНажмите «Слово», чтобы добавить первое.',
+                      'В наборе пока нет слов.\nНажмите «Слово», чтобы добавить первое,\nили импортируйте списком через меню ⋮.',
                       textAlign: TextAlign.center,
                     ),
                   ),
