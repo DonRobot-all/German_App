@@ -29,6 +29,9 @@ jobs:
             rm -rf _tmp_project
           fi
 
+      - name: Patch Android project
+        run: python3 tools/patch_android.py
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -37,7 +40,7 @@ jobs:
         continue-on-error: true
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-shrink
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
