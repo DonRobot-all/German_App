@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../db.dart';
 import '../models.dart';
 import '../importer.dart';
+import '../tts.dart';
 import 'import_screen.dart';
 import 'study_screens.dart';
 import 'word_edit_screen.dart';
@@ -184,6 +185,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                         ),
                         isThreeLine: extra.isNotEmpty,
                         onTap: () => _openEditor(w),
+                        trailing: SpeakButton(text: w.title),
                       ),
                     );
                   },

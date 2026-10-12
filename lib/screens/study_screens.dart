@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../db.dart';
 import '../models.dart';
+import '../settings.dart';
 import '../study.dart';
+import '../tts.dart';
 import 'written_screen.dart';
 
 // ======================================================================
@@ -46,7 +48,7 @@ class _StudySetupSheet extends StatefulWidget {
 class _StudySetupSheetState extends State<_StudySetupSheet> {
   StudyDirection _direction = StudyDirection.ruDe;
   int _size = 0; // 0 = все слова
-  bool _soft = false; // false = строгая проверка письма
+  bool _soft = AppSettings.instance.softCheck; // false = строгая проверка
 
   List<Word> _session() {
     final list = List<Word>.of(widget.words)..shuffle();
@@ -196,11 +198,15 @@ class WordInfo extends StatelessWidget {
     required this.word,
     this.showHeader = true,
     this.centered = false,
+    this.speakOnShow = false,
   });
 
   final Word word;
   final bool showHeader;
   final bool centered;
+
+  /// Произнести слово сразу при появлении (если включена автоозвучка).
+  final bool speakOnShow;
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +221,11 @@ class WordInfo extends StatelessWidget {
       crossAxisAlignment:
           centered ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
+        SpeakButton(
+          key: ValueKey<String>('info-${word.id}'),
+          text: word.title,
+          autoPlay: speakOnShow,
+        ),
         if (showHeader) ...[
           Text(
             word.title,
@@ -471,6 +482,12 @@ class _QuizScreenState extends State<QuizScreen> {
                           style: theme.textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
+                        if (q.direction == QuestionDirection.deToRu)
+                          SpeakButton(
+                            key: ValueKey<String>('qp-$_index'),
+                            text: q.word.title,
+                            autoPlay: true,
+                          ),
                         const SizedBox(height: 4),
                         Text(q.word.pos.label, style: theme.textTheme.bodySmall),
                       ],
@@ -495,7 +512,10 @@ class _QuizScreenState extends State<QuizScreen> {
                     padding: const EdgeInsets.all(16),
                     child: SizedBox(
                       width: double.infinity,
-                      child: WordInfo(word: q.word),
+                      child: WordInfo(
+                        word: q.word,
+                        speakOnShow: q.direction == QuestionDirection.ruToDe,
+                      ),
                     ),
                   ),
                 ),
@@ -652,7 +672,12 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          WordInfo(word: card.word, showHeader: false, centered: true),
+          WordInfo(
+            word: card.word,
+            showHeader: false,
+            centered: true,
+            speakOnShow: ruToDe,
+          ),
         ],
       );
     } else {
@@ -667,6 +692,12 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             style: theme.textTheme.headlineMedium
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
+          if (!ruToDe)
+            SpeakButton(
+              key: ValueKey<String>('fc-$_index'),
+              text: card.word.title,
+              autoPlay: true,
+            ),
           const SizedBox(height: 16),
           Text('Нажмите, чтобы перевернуть', style: theme.textTheme.bodySmall),
         ],

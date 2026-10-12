@@ -1,7 +1,7 @@
 name: german_words
 description: Приложение для изучения и повторения немецких слов.
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.6.0+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -14,6 +14,9 @@ dependencies:
   sqflite: ^2.3.3
   path: ^1.9.0
   uuid: ^4.4.0
+  shared_preferences: ^2.2.3
+  flutter_tts: ^4.0.2
+  flutter_local_notifications: ^17.2.0
 
 dev_dependencies:
   flutter_test:

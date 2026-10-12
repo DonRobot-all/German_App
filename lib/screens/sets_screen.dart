@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../db.dart';
 import '../models.dart';
+import '../reminders.dart';
+import '../settings.dart';
 import '../srs.dart';
 import 'set_detail_screen.dart';
+import 'settings_screen.dart';
 import 'smart_screen.dart';
+import 'stats_screen.dart';
 
 class SetsScreen extends StatefulWidget {
   const SetsScreen({super.key});
@@ -16,7 +22,7 @@ class SetsScreen extends StatefulWidget {
 class _SetsScreenState extends State<SetsScreen> {
   List<WordSet>? _sets;
   ReviewPlan? _plan;
-  bool _soft = false; // мягкая проверка письма (в строгом режиме false)
+  bool _soft = AppSettings.instance.softCheck; // false = строгая проверка
 
   @override
   void initState() {
@@ -32,6 +38,25 @@ class _SetsScreenState extends State<SetsScreen> {
       _sets = sets;
       _plan = plan;
     });
+    // Обновляем напоминания: учитываем, сколько слов ждёт и занимались ли сегодня.
+    unawaited(refreshReminders());
+  }
+
+  Future<void> _openStats() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const StatsScreen()),
+    );
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
+    );
+    if (!mounted) return;
+    setState(() => _soft = AppSettings.instance.softCheck);
+    await _load(); // размер сессии и «давно не писали» могли измениться
   }
 
   Future<void> _startSmart() async {
@@ -193,7 +218,21 @@ class _SetsScreenState extends State<SetsScreen> {
   Widget build(BuildContext context) {
     final sets = _sets;
     return Scaffold(
-      appBar: AppBar(title: const Text('Немецкие слова')),
+      appBar: AppBar(
+        title: const Text('Немецкие слова'),
+        actions: [
+          IconButton(
+            tooltip: 'Статистика',
+            icon: const Icon(Icons.bar_chart),
+            onPressed: _openStats,
+          ),
+          IconButton(
+            tooltip: 'Настройки',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSettings,
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _editSet(),
         icon: const Icon(Icons.add),

@@ -7,6 +7,7 @@ import '../checker.dart';
 import '../db.dart';
 import '../models.dart';
 import '../study.dart';
+import '../tts.dart';
 import 'study_screens.dart';
 
 class _WrittenQuestion {
@@ -215,6 +216,12 @@ class _WrittenScreenState extends State<WrittenScreen> {
                           style: theme.textTheme.headlineSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                         ),
+                        if (!ruToDe)
+                          SpeakButton(
+                            key: ValueKey<String>('wp-$_index'),
+                            text: q.word.title,
+                            autoPlay: true,
+                          ),
                         const SizedBox(height: 4),
                         Text(q.word.pos.label, style: theme.textTheme.bodySmall),
                       ],
@@ -274,7 +281,11 @@ class _WrittenScreenState extends State<WrittenScreen> {
                             style: theme.textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
-                          WordInfo(word: q.word, showHeader: false),
+                          WordInfo(
+                            word: q.word,
+                            showHeader: false,
+                            speakOnShow: ruToDe,
+                          ),
                         ],
                       ),
                     ),

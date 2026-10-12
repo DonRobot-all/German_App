@@ -8,6 +8,7 @@ import '../db.dart';
 import '../models.dart';
 import '../srs.dart';
 import '../study.dart';
+import '../tts.dart';
 import 'study_screens.dart';
 
 enum _Format { choice, written }
@@ -62,6 +63,7 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
   final FocusNode _focus = FocusNode();
 
   _Task? _current;
+  int _seq = 0; // номер текущего вопроса (для автоозвучки)
   int _total = 0;
   int _done = 0;
   int _firstTry = 0;
@@ -193,6 +195,7 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
         _current = null;
       } else {
         _current = _queue.removeAt(0);
+        _seq++;
         _selected = null;
         _result = null;
         _controller.clear();
@@ -254,6 +257,12 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
                 style: theme.textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
+              if (t.item.direction == QuestionDirection.deToRu)
+                SpeakButton(
+                  key: ValueKey<String>('sp-$_seq'),
+                  text: t.item.word.title,
+                  autoPlay: true,
+                ),
               const SizedBox(height: 4),
               Text(t.item.word.pos.label, style: theme.textTheme.bodySmall),
             ],
@@ -387,7 +396,10 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
               padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
-                child: WordInfo(word: q.word),
+                child: WordInfo(
+                  word: q.word,
+                  speakOnShow: q.direction == QuestionDirection.ruToDe,
+                ),
               ),
             ),
           ),
@@ -463,7 +475,11 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
                       style: theme.textTheme.titleLarge
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    WordInfo(word: w, showHeader: false),
+                    WordInfo(
+                      word: w,
+                      showHeader: false,
+                      speakOnShow: ruToDe,
+                    ),
                   ],
                 ),
               ),

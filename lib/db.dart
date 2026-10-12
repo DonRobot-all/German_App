@@ -3,7 +3,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'models.dart';
+import 'settings.dart';
 import 'srs.dart';
+import 'stats.dart';
 
 /// Локальная база данных (SQLite).
 ///
@@ -24,7 +26,29 @@ class AppDb {
 
   Future<Database> _open() async {
     final path = p.join(await getDatabasesPath(), 'german_words.db');
-    return openDatabase(path, version: 1, onCreate: _onCreate);
+    return openDatabase(
+      path,
+      version: 2,
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+    );
+  }
+
+  Future<void> _onUpgrade(Database d, int oldVersion, int newVersion) async {
+    // v2: журнал ответов для статистики.
+    if (oldVersion < 2) await _createLog(d);
+  }
+
+  Future<void> _createLog(Database d) async {
+    await d.execute('''
+      CREATE TABLE IF NOT EXISTS answer_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts INTEGER NOT NULL,
+        word_id TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        correct INTEGER NOT NULL,
+        written INTEGER NOT NULL
+      )''');
   }
 
   Future<void> _onCreate(Database d, int version) async {
@@ -75,6 +99,7 @@ class AppDb {
         updated_at INTEGER NOT NULL,
         PRIMARY KEY(word_id, direction)
       )''');
+    await _createLog(d);
   }
 
   // ---------- Прогресс и повторение ----------
@@ -119,6 +144,23 @@ class AppDb {
       updated.toMap(now),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    await _log(d, wordId, direction, correct: correct, written: written);
+  }
+
+  Future<void> _log(
+    Database d,
+    String wordId,
+    String direction, {
+    required bool correct,
+    required bool written,
+  }) async {
+    await d.insert('answer_log', {
+      'ts': DateTime.now().millisecondsSinceEpoch,
+      'word_id': wordId,
+      'direction': direction,
+      'correct': correct ? 1 : 0,
+      'written': written ? 1 : 0,
+    });
   }
 
   /// Повторный верный письменный ответ внутри сессии после ошибки:
@@ -132,13 +174,69 @@ class AppDb {
       where: 'word_id = ? AND direction = ?',
       whereArgs: [wordId, direction],
     );
+    await _log(d, wordId, direction, correct: true, written: true);
   }
 
   /// Собирает очередь «умного повторения» по всем словам приложения.
   Future<ReviewPlan> buildReviewPlan() async {
     final words = await listAllWords();
     final progress = await loadProgress();
-    return buildPlan(words: words, progress: progress, now: DateTime.now());
+    final s = AppSettings.instance;
+    return buildPlan(
+      words: words,
+      progress: progress,
+      now: DateTime.now(),
+      sessionSize: s.sessionSize,
+      newLimit: s.newPerSession,
+      staleDays: s.staleDays,
+    );
+  }
+
+  /// Данные для экрана статистики.
+  Future<StatsData> loadStats() async {
+    final d = await db;
+    final words = await listAllWords();
+    final progress = await loadProgress();
+    final since = DateTime.now()
+        .subtract(const Duration(days: 400))
+        .millisecondsSinceEpoch;
+    final rows = await d.query(
+      'answer_log',
+      columns: ['ts', 'correct'],
+      where: 'ts >= ?',
+      whereArgs: [since],
+      orderBy: 'ts',
+    );
+    final log = [
+      for (final r in rows)
+        AnswerLogEntry(
+          DateTime.fromMillisecondsSinceEpoch((r['ts'] as num).toInt()),
+          (r['correct'] as num).toInt() == 1,
+        ),
+    ];
+    return buildStats(
+      words: words,
+      progress: progress,
+      log: log,
+      now: DateTime.now(),
+    );
+  }
+
+  /// Сколько ответов дано начиная с момента [t].
+  Future<int> answersSince(DateTime t) async {
+    final d = await db;
+    final rows = await d.rawQuery(
+      'SELECT COUNT(*) AS c FROM answer_log WHERE ts >= ?',
+      [t.millisecondsSinceEpoch],
+    );
+    return rows.isEmpty ? 0 : (rows.first['c'] as num).toInt();
+  }
+
+  /// Стирает весь прогресс обучения и журнал ответов (слова остаются).
+  Future<void> resetProgress() async {
+    final d = await db;
+    await d.delete('word_progress');
+    await d.delete('answer_log');
   }
 
   // ---------- Наборы ----------
