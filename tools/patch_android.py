@@ -87,7 +87,16 @@ def patch_gradle(candidates=GRADLE_FILES):
         count=1,
     )
     if n == 0:
-        sys.exit('%s: блок compileOptions не найден' % path)
+        # В шаблоне нет блока compileOptions: создаём его внутри android { ... }.
+        block = ('compileOptions {\n        %s\n    }' % flag)
+        t, n = re.subn(
+            r'android\s*\{',
+            lambda m: m.group(0) + '\n    ' + block,
+            t,
+            count=1,
+        )
+    if n == 0:
+        sys.exit('%s: не найден блок android { ... }' % path)
 
     if is_kts:
         dep = 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:%s")' % DESUGAR_VERSION
