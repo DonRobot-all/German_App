@@ -178,3 +178,47 @@ AnswerCheck checkRussian(Word w, String input, {required bool soft}) {
   }
   return const AnswerCheck(false);
 }
+
+/// Проверка одной формы глагола («geht», «ging», «ist gegangen»).
+///
+/// Допускается лишнее местоимение в начале («er geht»). Если в эталоне
+/// несколько вариантов через «/», подойдёт любой.
+AnswerCheck checkForm(String expected, String input, {required bool soft}) {
+  var typed = _collapse(input);
+  if (typed.isEmpty) return const AnswerCheck(false, 'Ответ не введён.');
+  typed = typed
+      .replaceFirst(
+        RegExp(r'^(ich|du|er/sie/es|er|sie|es|wir|ihr)\s+',
+            caseSensitive: false),
+        '',
+      )
+      .trim();
+
+  final variants = expected
+      .split(RegExp(r'\s*/\s*'))
+      .map(_collapse)
+      .where((s) => s.isNotEmpty)
+      .toList();
+  if (variants.isEmpty) variants.add(_collapse(expected));
+
+  var best = _Match.none;
+  for (final v in variants) {
+    final m = _matchWord(v, typed);
+    if (m == _Match.exact) return const AnswerCheck(true);
+    if (m == _Match.folded && best != _Match.folded) best = m;
+    if (m == _Match.typo && best == _Match.none) best = m;
+  }
+  if (soft && best == _Match.folded) {
+    return AnswerCheck(true, 'Правильно пишется: ${variants.first}');
+  }
+  if (soft && best == _Match.typo) {
+    return AnswerCheck(true, 'Засчитано, но есть опечатка: ${variants.first}');
+  }
+  if (best == _Match.folded) {
+    return const AnswerCheck(false, 'Проверьте регистр и умлауты.');
+  }
+  if (best == _Match.typo) {
+    return const AnswerCheck(false, 'Почти правильно, но в строгом режиме это ошибка.');
+  }
+  return const AnswerCheck(false);
+}

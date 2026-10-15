@@ -8,6 +8,9 @@ import '../models.dart';
 import '../settings.dart';
 import '../study.dart';
 import '../tts.dart';
+import 'article_screen.dart';
+import 'match_screen.dart';
+import 'verbforms_screen.dart';
 import 'written_screen.dart';
 
 // ======================================================================
@@ -102,12 +105,37 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
     );
   }
 
+  void _push(Widget screen) {
+    final root = widget.rootContext;
+    Navigator.pop(context);
+    Navigator.push(root, MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
+  List<Word> _limited(List<Word> list) {
+    final l = List<Word>.of(list)..shuffle();
+    if (_size > 0 && l.length > _size) return l.take(_size).toList();
+    return l;
+  }
+
+  void _startArticles() =>
+      _push(ArticleScreen(words: _limited(articleWords(widget.words))));
+
+  void _startVerbs() => _push(VerbFormsScreen(
+        words: _limited(verbFormWords(widget.words)),
+        soft: _soft,
+      ));
+
+  void _startMatch() => _push(MatchScreen(words: _session()));
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canQuiz = widget.pool.length >= 2;
+    final nArticles = articleWords(widget.words).length;
+    final nVerbs = verbFormWords(widget.words).length;
+    final canMatch = widget.words.length >= 3;
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -170,6 +198,28 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
               onPressed: _startWritten,
               icon: const Icon(Icons.edit_outlined),
               label: const Text('Письменный ввод'),
+            ),
+            const SizedBox(height: 16),
+            Text('Особые тренировки', style: theme.textTheme.labelLarge),
+            const SizedBox(height: 6),
+            OutlinedButton.icon(
+              onPressed: canMatch ? _startMatch : null,
+              icon: const Icon(Icons.extension_outlined),
+              label: Text(canMatch
+                  ? 'Игра «Сопоставление»'
+                  : 'Сопоставление (нужно 3+ слова)'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: nArticles > 0 ? _startArticles : null,
+              icon: const Icon(Icons.label_outline),
+              label: Text('Артикли (существительных: $nArticles)'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: nVerbs > 0 ? _startVerbs : null,
+              icon: const Icon(Icons.swap_horiz),
+              label: Text('Формы глаголов (глаголов: $nVerbs)'),
             ),
             if (!canQuiz)
               Padding(
