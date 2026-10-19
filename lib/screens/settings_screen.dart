@@ -4,6 +4,7 @@ import '../db.dart';
 import '../reminders.dart';
 import '../settings.dart';
 import '../tts.dart';
+import '../updater.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,6 +15,31 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final AppSettings _s = AppSettings.instance;
+  bool _checking = false;
+  String? _updateText;
+  UpdateInfo? _updateInfo;
+
+  Future<void> _checkUpdates() async {
+    setState(() {
+      _checking = true;
+      _updateText = null;
+      _updateInfo = null;
+    });
+    final r = await checkForUpdate();
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      switch (r.status) {
+        case UpdateStatus.available:
+          _updateInfo = r.info;
+          _updateText = 'Доступна новая версия: сборка ${r.info!.build}.';
+        case UpdateStatus.upToDate:
+          _updateText = 'У вас последняя версия.';
+        case UpdateStatus.unknown:
+          _updateText = r.message ?? 'Не удалось проверить обновления.';
+      }
+    });
+  }
 
   void _change(void Function() f) {
     _s.update(f);
@@ -257,6 +283,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'каждом открытии приложения. Если не открывать его две недели, '
               'они прекратятся.',
               style: theme.textTheme.bodySmall,
+            ),
+          _section('О приложении'),
+          Text(
+            kBuildNumber > 0
+                ? 'Сборка $kBuildNumber'
+                : 'Сборка без номера (локальная)',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: _checking ? null : _checkUpdates,
+              icon: const Icon(Icons.system_update_alt),
+              label: Text(_checking ? 'Проверяю…' : 'Проверить обновления'),
+            ),
+          ),
+          if (_updateText != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(_updateText!, style: theme.textTheme.bodyMedium),
+            ),
+          if (_updateInfo != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: FilledButton(
+                  onPressed: () => openDownload(_updateInfo!),
+                  child: const Text('Скачать и установить'),
+                ),
+              ),
             ),
           _section('Данные'),
           Align(

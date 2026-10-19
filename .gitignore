@@ -9,3 +9,5 @@ _tmp_project/
 .idea/
 *.iml
 local.properties
+signing/
+*.jks

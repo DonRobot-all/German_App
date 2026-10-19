@@ -28,7 +28,7 @@ class AppDb {
     final path = p.join(await getDatabasesPath(), 'german_words.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -37,6 +37,10 @@ class AppDb {
   Future<void> _onUpgrade(Database d, int oldVersion, int newVersion) async {
     // v2: журнал ответов для статистики.
     if (oldVersion < 2) await _createLog(d);
+    // v3: падеж после предлога у глаголов с управлением.
+    if (oldVersion < 3) {
+      await d.execute('ALTER TABLE words ADD COLUMN prep_case TEXT');
+    }
   }
 
   Future<void> _createLog(Database d) async {
@@ -73,6 +77,7 @@ class AppDb {
         present3 TEXT,
         preterite TEXT,
         perfect TEXT,
+        prep_case TEXT,
         updated_at INTEGER NOT NULL,
         deleted INTEGER NOT NULL DEFAULT 0
       )''');

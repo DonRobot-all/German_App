@@ -13,6 +13,7 @@ class DraftWord {
     this.present3,
     this.preterite,
     this.perfect,
+    this.prepCase,
     this.warnings = const [],
   });
 
@@ -26,6 +27,7 @@ class DraftWord {
   final String? present3;
   final String? preterite;
   final String? perfect;
+  final String? prepCase;
 
   /// Замечания по разбору («нет артикля» и т. п.), не блокируют импорт.
   final List<String> warnings;
@@ -38,6 +40,8 @@ class DraftWord {
 
   String? get pluralLine =>
       (pos == Pos.noun && plural != null) ? 'мн. ч.: die $plural' : null;
+
+  String? get prepLine => prepCase == null ? null : 'падеж: $prepCase.';
 
   String? get verbFormsLine {
     if (pos != Pos.verb) return null;
@@ -61,6 +65,7 @@ class DraftWord {
         present3: present3,
         preterite: preterite,
         perfect: perfect,
+        prepCase: prepCase,
       );
 }
 
@@ -86,6 +91,21 @@ class ImportParseResult {
 final RegExp _cyrillic = RegExp(r'[а-яёА-ЯЁ]');
 final RegExp _articleRe = RegExp(r'^(der|die|das)\s+(.+)$', caseSensitive: false);
 final RegExp _dieRe = RegExp(r'^die\s+', caseSensitive: false);
+
+/// Глагол с предлогом: «abhängen von», «sich freuen auf + Akk». Глагол пишется
+/// строчными буквами, поэтому существительные сюда не попадают.
+final RegExp _prepVerbRe = RegExp(
+  r'^((?:sich\s+)?[a-zäöüß]+)\s+'
+  r'(an|auf|aus|bei|bis|durch|für|gegen|in|mit|nach|ohne|über|um|unter|von|vor|zu)'
+  r'(?:\s*\+?\s*([Aa]kk|[Dd]at)\.?)?$',
+);
+
+String? _normCase(String s) {
+  final t = s.trim().toLowerCase().replaceAll('.', '').replaceAll('+', '').trim();
+  if (t == 'akk') return 'Akk';
+  if (t == 'dat') return 'Dat';
+  return null;
+}
 
 const Set<String> _headerWords = {
   'немецкое слово',
@@ -236,6 +256,7 @@ DraftWord? _buildDraft(List<String> cells, int lineNo, List<String> errors) {
   String? perfect = _opt(cell(6));
   final example = _opt(cell(7));
   final note = _opt(cell(8));
+  String? prepCase = _normCase(cell(9));
 
   var main = c0;
 
@@ -277,6 +298,15 @@ DraftWord? _buildDraft(List<String> cells, int lineNo, List<String> errors) {
     }
   }
 
+  // «abhängen von + Dat.», «sich freuen auf + Akk»: глагол с предлогом.
+  final pv = _prepVerbRe.firstMatch(main);
+  var isPrepVerb = false;
+  if (pv != null) {
+    isPrepVerb = true;
+    main = '${pv.group(1)} ${pv.group(2)}';
+    prepCase ??= _normCase(pv.group(3) ?? '');
+  }
+
   String german;
   String? article;
   final m = _articleRe.firstMatch(main);
@@ -302,6 +332,8 @@ DraftWord? _buildDraft(List<String> cells, int lineNo, List<String> errors) {
     pos = Pos.noun;
   } else if (posHint != null) {
     pos = posHint;
+  } else if (isPrepVerb) {
+    pos = Pos.verb;
   } else if (formsFromText ||
       present3 != null ||
       preterite != null ||
@@ -345,6 +377,7 @@ DraftWord? _buildDraft(List<String> cells, int lineNo, List<String> errors) {
     present3: isVerb ? present3 : null,
     preterite: isVerb ? preterite : null,
     perfect: isVerb ? perfect : null,
+    prepCase: isVerb ? prepCase : null,
     warnings: warnings,
   );
 }
@@ -402,7 +435,7 @@ ImportParseResult parseWordList(String raw) {
 }
 
 const String kExportHeader =
-    'Немецкое слово\tПеревод\tМн. число\tЧасть речи\tPräsens\tPräteritum\tPerfekt\tПример\tЗаметка';
+    'Немецкое слово\tПеревод\tМн. число\tЧасть речи\tPräsens\tPräteritum\tPerfekt\tПример\tЗаметка\tПадеж';
 
 /// Текст для копирования: таблица с табуляциями. Его же понимает импорт.
 String exportWords(List<Word> words) {
@@ -426,6 +459,7 @@ String exportWords(List<Word> words) {
       f(w.perfect),
       f(w.example),
       f(w.note),
+      f(w.prepCase),
     ].join('\t'));
   }
   return b.toString();

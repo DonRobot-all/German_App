@@ -25,6 +25,7 @@ class _WordEditScreenState extends State<WordEditScreen> {
 
   late Pos _pos;
   String? _article;
+  String? _prepCase;
   bool _articleError = false;
   bool _saving = false;
 
@@ -48,6 +49,7 @@ class _WordEditScreenState extends State<WordEditScreen> {
     final w = widget.word;
     _pos = w?.pos ?? Pos.noun;
     _article = w?.article;
+    _prepCase = w?.prepCase;
     _german = TextEditingController(text: w?.german ?? '');
     _plural = TextEditingController(text: w?.plural ?? '');
     _translations = TextEditingController(text: w?.translations.join('; ') ?? '');
@@ -154,6 +156,7 @@ class _WordEditScreenState extends State<WordEditScreen> {
       present3: isVerb ? _opt(_present3) : null,
       preterite: isVerb ? _opt(_preterite) : null,
       perfect: isVerb ? _opt(_perfect) : null,
+      prepCase: isVerb ? _prepCase : null,
     );
 
     setState(() => _saving = true);
@@ -165,6 +168,7 @@ class _WordEditScreenState extends State<WordEditScreen> {
       setState(() {
         _saving = false;
         _article = null;
+        _prepCase = null;
         _articleError = false;
       });
       if (_scroll.hasClients) _scroll.jumpTo(0);
@@ -252,7 +256,7 @@ class _WordEditScreenState extends State<WordEditScreen> {
     final germanLabel = isNoun
         ? 'Слово (например, Tisch)'
         : isVerb
-            ? 'Инфинитив (например, gehen)'
+            ? 'Инфинитив (gehen; с предлогом: abhängen von)'
             : 'Немецкое слово';
 
     return Scaffold(
@@ -339,6 +343,38 @@ class _WordEditScreenState extends State<WordEditScreen> {
                     _field(_present3, 'Präsens, er/sie/es', hint: 'geht'),
                     _field(_preterite, 'Präteritum, er/sie/es', hint: 'ging'),
                     _field(_perfect, 'Perfekt', hint: 'ist gegangen'),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Падеж после предлога (для «abhängen von», '
+                            '«warten auf»)',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              ChoiceChip(
+                                label: const Text('нет'),
+                                selected: _prepCase == null,
+                                onSelected: (_) =>
+                                    setState(() => _prepCase = null),
+                              ),
+                              for (final c in kCases)
+                                ChoiceChip(
+                                  label: Text(c),
+                                  selected: _prepCase == c,
+                                  onSelected: (_) =>
+                                      setState(() => _prepCase = c),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                   _field(
                     _translations,

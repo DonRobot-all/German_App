@@ -159,6 +159,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                     final extra = <String>[
                       if (w.pluralLine != null) w.pluralLine!,
                       if (w.verbFormsLine != null) w.verbFormsLine!,
+                      if (w.prepLine != null) w.prepLine!,
                     ];
                     return Dismissible(
                       key: ValueKey(w.id),

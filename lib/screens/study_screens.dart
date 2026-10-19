@@ -10,6 +10,7 @@ import '../study.dart';
 import '../tts.dart';
 import 'article_screen.dart';
 import 'match_screen.dart';
+import 'prep_screen.dart';
 import 'verbforms_screen.dart';
 import 'written_screen.dart';
 
@@ -125,6 +126,9 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
         soft: _soft,
       ));
 
+  void _startPreps() =>
+      _push(PrepScreen(words: _limited(prepVerbWords(widget.words))));
+
   void _startMatch() => _push(MatchScreen(words: _session()));
 
   @override
@@ -133,6 +137,7 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
     final canQuiz = widget.pool.length >= 2;
     final nArticles = articleWords(widget.words).length;
     final nVerbs = verbFormWords(widget.words).length;
+    final nPreps = prepVerbWords(widget.words).length;
     final canMatch = widget.words.length >= 3;
     return SafeArea(
       child: SingleChildScrollView(
@@ -221,6 +226,12 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
               icon: const Icon(Icons.swap_horiz),
               label: Text('Формы глаголов (глаголов: $nVerbs)'),
             ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: nPreps > 0 ? _startPreps : null,
+              icon: const Icon(Icons.link),
+              label: Text('Глаголы с предлогами (слов: $nPreps)'),
+            ),
             if (!canQuiz)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -265,6 +276,7 @@ class WordInfo extends StatelessWidget {
     final lines = <String>[
       if (word.pluralLine != null) word.pluralLine!,
       if (word.verbFormsLine != null) word.verbFormsLine!,
+      if (word.prepLine != null) word.prepLine!,
     ];
     return Column(
       mainAxisSize: MainAxisSize.min,

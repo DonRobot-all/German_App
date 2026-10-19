@@ -159,6 +159,7 @@ class _ImportScreenState extends State<ImportScreen> {
     final extra = <String>[
       if (d.pluralLine != null) d.pluralLine!,
       if (d.verbFormsLine != null) d.verbFormsLine!,
+      if (d.prepLine != null) d.prepLine!,
     ];
     return Card(
       child: ListTile(

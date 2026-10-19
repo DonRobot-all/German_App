@@ -20,6 +20,31 @@ extension PosLabel on Pos {
 
 const List<String> kArticles = ['der', 'die', 'das'];
 
+/// Падежи после предлога у глаголов с управлением.
+const List<String> kCases = ['Akk', 'Dat'];
+
+/// Предлоги, которые встречаются в глаголах с управлением.
+const List<String> kPrepositions = [
+  'an',
+  'auf',
+  'aus',
+  'bei',
+  'bis',
+  'durch',
+  'für',
+  'gegen',
+  'in',
+  'mit',
+  'nach',
+  'ohne',
+  'über',
+  'um',
+  'unter',
+  'von',
+  'vor',
+  'zu',
+];
+
 Pos posFromName(String? name) {
   for (final p in Pos.values) {
     if (p.name == name) return p;
@@ -63,6 +88,7 @@ class Word {
     this.present3,
     this.preterite,
     this.perfect,
+    this.prepCase,
   });
 
   final String id;
@@ -90,6 +116,29 @@ class Word {
 
   /// Глагол: Perfekt, например «ist gegangen».
   final String? perfect;
+
+  /// Глагол с предлогом: падеж после предлога, 'Akk' или 'Dat'.
+  final String? prepCase;
+
+  /// Предлог глагола с управлением: для «abhängen von» это «von».
+  /// У глаголов без предлога — null.
+  String? get prep {
+    if (pos != Pos.verb) return null;
+    final parts = german.trim().split(RegExp(r'\s+'));
+    if (parts.length < 2) return null;
+    final last = parts.last.toLowerCase();
+    return kPrepositions.contains(last) ? last : null;
+  }
+
+  /// Глагол без предлога: «abhängen» из «abhängen von».
+  String? get prepStem {
+    if (prep == null) return null;
+    final parts = german.trim().split(RegExp(r'\s+'));
+    return parts.sublist(0, parts.length - 1).join(' ');
+  }
+
+  String? get prepLine =>
+      (prep != null && prepCase != null) ? 'управление: $prep + $prepCase.' : null;
 
   /// Слово так, как оно должно писаться: «der Tisch».
   String get title =>
@@ -120,6 +169,7 @@ class Word {
         'present3': present3,
         'preterite': preterite,
         'perfect': perfect,
+        'prep_case': prepCase,
         'updated_at': updatedAt,
         'deleted': 0,
       };
@@ -138,6 +188,7 @@ class Word {
       present3: m['present3'] as String?,
       preterite: m['preterite'] as String?,
       perfect: m['perfect'] as String?,
+      prepCase: m['prep_case'] as String?,
     );
   }
 }

@@ -7,6 +7,7 @@ import '../models.dart';
 import '../reminders.dart';
 import '../settings.dart';
 import '../srs.dart';
+import '../updater.dart';
 import 'set_detail_screen.dart';
 import 'settings_screen.dart';
 import 'smart_screen.dart';
@@ -23,11 +24,43 @@ class _SetsScreenState extends State<SetsScreen> {
   List<WordSet>? _sets;
   ReviewPlan? _plan;
   bool _soft = AppSettings.instance.softCheck; // false = строгая проверка
+  UpdateInfo? _update;
 
   @override
   void initState() {
     super.initState();
     _load();
+    unawaited(_checkUpdate());
+  }
+
+  Future<void> _checkUpdate() async {
+    final r = await checkForUpdate();
+    if (!mounted || r.status != UpdateStatus.available) return;
+    setState(() => _update = r.info);
+  }
+
+  Widget _updateCard(BuildContext context) {
+    final u = _update;
+    if (u == null) return const SizedBox.shrink();
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: ListTile(
+        leading: const Icon(Icons.system_update),
+        title: Text('Доступна новая версия (сборка ${u.build})'),
+        subtitle: const Text('Скачайте файл и нажмите «Установить».'),
+        trailing: FilledButton(
+          onPressed: () async {
+            final ok = await openDownload(u);
+            if (!ok && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Не удалось открыть ссылку')),
+              );
+            }
+          },
+          child: const Text('Обновить'),
+        ),
+      ),
+    );
   }
 
   Future<void> _load() async {
@@ -252,10 +285,11 @@ class _SetsScreenState extends State<SetsScreen> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 88),
-                  itemCount: sets.length + 1,
+                  itemCount: sets.length + 2,
                   itemBuilder: (context, i) {
-                    if (i == 0) return _reviewCard(context);
-                    final s = sets[i - 1];
+                    if (i == 0) return _updateCard(context);
+                    if (i == 1) return _reviewCard(context);
+                    final s = sets[i - 2];
                     final sub = s.description.isEmpty
                         ? wordsCount(s.wordCount)
                         : '${s.description}\n${wordsCount(s.wordCount)}';

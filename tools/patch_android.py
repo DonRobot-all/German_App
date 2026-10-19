@@ -109,6 +109,96 @@ def patch_gradle(candidates=GRADLE_FILES):
     print('%s: desugaring включён' % path)
 
 
+KEYSTORE = 'signing/release.jks'
+KEY_ALIAS = 'germanwords'
+# Пароль в репозитории не хранится: CI передаёт его из GitHub Secrets.
+PASSWORD_ENV = 'KEYSTORE_PASSWORD'
+
+
+def patch_signing(candidates=GRADLE_FILES, keystore=KEYSTORE):
+    """Подписывает релиз постоянным ключом из репозитория.
+
+    Без этого каждая сборка в CI получает новый случайный debug-ключ, и Android
+    не позволяет установить новую версию поверх старой.
+    """
+    if not os.path.exists(keystore) or not os.environ.get(PASSWORD_ENV):
+        print('ВНИМАНИЕ: нет ключа подписи (файл %s и переменная %s, их задают '
+              'секреты GitHub). Сборка будет подписана случайным debug-ключом, '
+              'обновление поверх старой версии не сработает.'
+              % (keystore, PASSWORD_ENV))
+        return
+    path = next((p for p in candidates if os.path.exists(p)), None)
+    if path is None:
+        sys.exit('build.gradle(.kts) приложения не найден')
+    with open(path, encoding='utf-8') as f:
+        t = f.read()
+    if 'signing/release.jks' in t:
+        print('%s: подпись уже настроена' % path)
+        return
+
+    is_kts = path.endswith('.kts')
+    store = '../../' + keystore  # путь от папки android/app
+    if is_kts:
+        block = (
+            '    signingConfigs {\n'
+            '        create("release") {\n'
+            '            storeFile = file("%s")\n'
+            '            storePassword = System.getenv("%s")\n'
+            '            keyAlias = "%s"\n'
+            '            keyPassword = System.getenv("%s")\n'
+            '        }\n'
+            '    }\n\n' % (store, PASSWORD_ENV, KEY_ALIAS, PASSWORD_ENV))
+    else:
+        block = (
+            '    signingConfigs {\n'
+            '        release {\n'
+            "            storeFile file('%s')\n"
+            "            storePassword System.getenv('%s')\n"
+            "            keyAlias '%s'\n"
+            "            keyPassword System.getenv('%s')\n"
+            '        }\n'
+            '    }\n\n' % (store, PASSWORD_ENV, KEY_ALIAS, PASSWORD_ENV))
+
+    t, n = re.subn(
+        r'([ \t]*)buildTypes\s*\{',
+        lambda m: block + m.group(0),
+        t,
+        count=1,
+    )
+    if n == 0:
+        sys.exit('%s: не найден блок buildTypes { ... }' % path)
+
+    if is_kts:
+        t, n = re.subn(
+            r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
+            'signingConfig = signingConfigs.getByName("release")',
+            t,
+        )
+        line = 'signingConfig = signingConfigs.getByName("release")'
+    else:
+        t, n = re.subn(
+            r'signingConfig\s+signingConfigs\.debug',
+            'signingConfig signingConfigs.release',
+            t,
+        )
+        line = 'signingConfig signingConfigs.release'
+    if n == 0:
+        # В шаблоне нет строки с debug-подписью: добавляем в release { ... }.
+        t, n = re.subn(
+            r'(buildTypes\s*\{\s*(?:getByName\("release"\)|release)\s*\{)',
+            lambda m: m.group(1) + '\n            ' + line,
+            t,
+            count=1,
+        )
+    if n == 0:
+        sys.exit('%s: не найден блок release { ... } в buildTypes' % path)
+
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(t)
+    print('%s: релиз подписывается ключом %s' % (path, keystore))
+
+
 if __name__ == '__main__':
     patch_manifest()
     patch_gradle()
+    patch_signing()

@@ -1,0 +1,64 @@
+abhängen von + Dat.	зависеть от
+achten auf + Akk	обращать внимание на
+antworten auf + Akk	отвечать на
+sich ärgern über + Akk	злиться из-за
+arbeiten an + Dat.	работать над
+sich bedanken für + Akk	благодарить за
+beginnen mit + Dat.	начинать с
+sich beschäftigen mit + Dat.	заниматься (чем-либо)
+sich beschweren über + Akk	жаловаться на
+sich beteiligen an + Dat.	участвовать в
+sich bewerben um + Akk	подавать заявку на
+bestehen aus + Dat.	состоять из
+bitten um + Akk	просить о
+denken an + Akk	думать о
+diskutieren über + Akk	обсуждать
+einladen zu + Dat.	приглашать на
+sich entscheiden für + Akk	решиться на, выбрать
+sich entschuldigen für + Akk	извиняться за
+sich erinnern an + Akk	вспоминать, помнить о
+sich erkundigen nach + Dat.	узнавать, справляться о
+erzählen von + Dat.	рассказывать о
+fragen nach + Dat.	спрашивать о
+sich freuen auf + Akk	радоваться (предстоящему)
+sich freuen über + Akk	радоваться (случившемуся)
+glauben an + Akk	верить в
+gehören zu + Dat.	относиться к, входить в
+sich gewöhnen an + Akk	привыкать к
+gratulieren zu + Dat.	поздравлять с
+halten von + Dat.	думать о, быть мнения о
+hoffen auf + Akk	надеяться на
+sich informieren über + Akk	узнавать о, информироваться о
+sich interessieren für + Akk	интересоваться
+kämpfen für + Akk	бороться за
+kämpfen gegen + Akk	бороться против
+klagen über + Akk	жаловаться на
+sich konzentrieren auf + Akk	концентрироваться на
+sich kümmern um + Akk	заботиться о
+lachen über + Akk	смеяться над
+leiden unter + Dat.	страдать от
+nachdenken über + Akk	размышлять о
+protestieren gegen + Akk	протестовать против
+reagieren auf + Akk	реагировать на
+rechnen mit + Dat.	рассчитывать на
+reden über + Akk	говорить о
+schreiben an + Akk	писать (кому-либо)
+schützen vor + Dat.	защищать от
+sorgen für + Akk	заботиться о
+sprechen mit + Dat.	разговаривать с
+sprechen über + Akk	говорить о
+sich streiten über + Akk	спорить о
+suchen nach + Dat.	искать
+teilnehmen an + Dat.	принимать участие в
+telefonieren mit + Dat.	разговаривать по телефону с
+träumen von + Dat.	мечтать о
+sich unterhalten über + Akk	беседовать о
+sich verabreden mit + Dat.	договариваться о встрече с
+sich verlassen auf + Akk	полагаться на
+sich verlieben in + Akk	влюбляться в
+verzichten auf + Akk	отказываться от
+sich vorbereiten auf + Akk	готовиться к
+warnen vor + Dat.	предупреждать о
+warten auf + Akk	ждать
+sich wundern über + Akk	удивляться
+zweifeln an + Dat.	сомневаться в
