@@ -95,15 +95,22 @@ final RegExp _dieRe = RegExp(r'^die\s+', caseSensitive: false);
 /// Глагол с предлогом: «abhängen von», «sich freuen auf + Akk». Глагол пишется
 /// строчными буквами, поэтому существительные сюда не попадают.
 final RegExp _prepVerbRe = RegExp(
-  r'^((?:sich\s+)?[a-zäöüß]+)\s+'
+  r'^((?:sich )?[a-zäöüß]+) '
   r'(an|auf|aus|bei|bis|durch|für|gegen|in|mit|nach|ohne|über|um|unter|von|vor|zu)'
-  r'(?:\s*\+?\s*([Aa]kk|[Dd]at)\.?)?$',
+  r'(?: ([Aa]kk|[Dd]at|[Aa]kkusativ|[Dd]ativ|[Aa]cc)\.?)?$',
 );
 
+/// Приводит запись к виду «warten auf Akk»: убирает скобки, плюсы и запятые.
+/// Так понимаются «warten auf + Akk», «warten (auf + Akk)», «warten + auf + Akk».
+String _flattenPrep(String s) => s
+    .replaceAll(RegExp(r'[()+,]'), ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
 String? _normCase(String s) {
-  final t = s.trim().toLowerCase().replaceAll('.', '').replaceAll('+', '').trim();
-  if (t == 'akk') return 'Akk';
-  if (t == 'dat') return 'Dat';
+  final t = s.trim().toLowerCase().replaceAll(RegExp(r'[.+()]'), '').trim();
+  if (t == 'akk' || t == 'akkusativ' || t == 'acc' || t == 'a') return 'Akk';
+  if (t == 'dat' || t == 'dativ' || t == 'd') return 'Dat';
   return null;
 }
 
@@ -299,12 +306,15 @@ DraftWord? _buildDraft(List<String> cells, int lineNo, List<String> errors) {
   }
 
   // «abhängen von + Dat.», «sich freuen auf + Akk»: глагол с предлогом.
-  final pv = _prepVerbRe.firstMatch(main);
+  final pv = _prepVerbRe.firstMatch(_flattenPrep(main));
   var isPrepVerb = false;
   if (pv != null) {
     isPrepVerb = true;
     main = '${pv.group(1)} ${pv.group(2)}';
     prepCase ??= _normCase(pv.group(3) ?? '');
+    if (prepCase == null) {
+      warnings.add('нет падежа после предлога: добавьте Akk или Dat');
+    }
   }
 
   String german;

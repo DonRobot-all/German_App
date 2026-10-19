@@ -97,6 +97,7 @@ class _ImportScreenState extends State<ImportScreen> {
                 'der Tisch ; стол\n'
                 'der Tisch, die Tische ; стол\n'
                 'gehen, ging, ist gegangen ; идти\n'
+                'warten auf + Akk ; ждать (глагол с предлогом и падежом)\n'
                 'Если русское слово стоит слева (как в Quizlet), столбцы '
                 'поменяются местами сами. Из Quizlet: Экспорт → Копировать '
                 'текст, затем вставьте сюда.',
