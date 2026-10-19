@@ -92,10 +92,11 @@ Future<UpdateResult> checkForUpdate() async {
     return UpdateResult(UpdateStatus.available, info: UpdateInfo(latest, url));
   } on TimeoutException {
     return const UpdateResult(UpdateStatus.unknown, message: 'Нет связи с GitHub.');
-  } catch (_) {
-    return const UpdateResult(
+  } catch (e) {
+    return UpdateResult(
       UpdateStatus.unknown,
-      message: 'Не удалось проверить обновления.',
+      message: 'Не удалось проверить обновления (${e.runtimeType}). '
+          'Проверьте интернет.',
     );
   } finally {
     client.close(force: true);

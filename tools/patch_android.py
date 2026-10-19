@@ -19,6 +19,9 @@ TTS_QUERIES = (
 )
 
 PERMISSIONS = (
+    # В релизной сборке Flutter интернет по умолчанию не разрешает; без него
+    # не работает проверка обновлений.
+    'android.permission.INTERNET',
     'android.permission.POST_NOTIFICATIONS',
     'android.permission.RECEIVE_BOOT_COMPLETED',
 )
