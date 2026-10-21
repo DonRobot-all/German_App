@@ -20,20 +20,41 @@ class SetsScreen extends StatefulWidget {
   State<SetsScreen> createState() => _SetsScreenState();
 }
 
-class _SetsScreenState extends State<SetsScreen> {
+class _SetsScreenState extends State<SetsScreen> with WidgetsBindingObserver {
   List<WordSet>? _sets;
   ReviewPlan? _plan;
   bool _soft = AppSettings.instance.softCheck; // false = строгая проверка
   UpdateInfo? _update;
+  DateTime? _lastCheck;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
     unawaited(_checkUpdate());
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// При возвращении в приложение проверяем обновления снова (не чаще раза в 2 минуты).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final last = _lastCheck;
+    if (last != null &&
+        DateTime.now().difference(last) < const Duration(minutes: 2)) {
+      return;
+    }
+    unawaited(_checkUpdate());
+  }
+
   Future<void> _checkUpdate() async {
+    _lastCheck = DateTime.now();
     final r = await checkForUpdate();
     if (!mounted || r.status != UpdateStatus.available) return;
     setState(() => _update = r.info);

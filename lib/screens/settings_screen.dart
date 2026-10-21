@@ -1,5 +1,12 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../backup.dart';
 import '../db.dart';
 import '../reminders.dart';
 import '../settings.dart';
@@ -16,6 +23,113 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final AppSettings _s = AppSettings.instance;
   bool _checking = false;
+  bool _busy = false;
+  DateTime? _lastBackup;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastBackup();
+  }
+
+  Future<void> _loadLastBackup() async {
+    final t = await lastBackupTime();
+    if (!mounted) return;
+    setState(() => _lastBackup = t);
+  }
+
+  void _snack(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  /// Сохраняет все данные в файл и открывает окно «Поделиться»: оттуда файл
+  /// можно отправить в Telegram, на Диск или сохранить в «Файлы».
+  Future<void> _backup() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final json = await buildBackupJson();
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/${backupFileName(DateTime.now())}');
+      await file.writeAsString(json, flush: true);
+      final res = await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'application/json')],
+        subject: 'Резервная копия «Немецкие слова»',
+      );
+      if (res.status != ShareResultStatus.dismissed) {
+        await markBackupDone();
+        await _loadLastBackup();
+      }
+    } catch (e) {
+      _snack('Не удалось сделать копию: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Выбор файла копии и восстановление из него.
+  Future<void> _restore() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final pick = await FilePicker.platform
+          .pickFiles(type: FileType.any, withData: true);
+      if (pick == null || pick.files.isEmpty) return;
+      final bytes = pick.files.single.bytes;
+      if (bytes == null) {
+        _snack('Не удалось прочитать файл');
+        return;
+      }
+      final BackupData data;
+      try {
+        data = parseBackup(utf8.decode(bytes));
+      } on FormatException catch (e) {
+        _snack('Файл не подходит: ${e.message}');
+        return;
+      }
+      if (!mounted) return;
+      final when = data.created == null
+          ? 'дата неизвестна'
+          : formatBackupDate(data.created!);
+      final mode = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Восстановить из копии?'),
+          content: Text(
+            'Копия от $when\n'
+            'Наборов: ${data.setCount}, слов: ${data.wordCount}, '
+            'записей прогресса: ${data.progressCount}.\n\n'
+            '«Объединить»: добавит то, чего нет на телефоне, а если запись '
+            'есть и там и там, оставит более свежую.\n\n'
+            '«Заменить всё»: сотрёт все данные в приложении и поставит данные '
+            'из копии.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Отмена'),
+            ),
+            FilledButton.tonal(
+              onPressed: () => Navigator.pop(ctx, 'merge'),
+              child: const Text('Объединить'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'replace'),
+              child: const Text('Заменить всё'),
+            ),
+          ],
+        ),
+      );
+      if (mode == null) return;
+      final r = await restoreBackup(data, replace: mode == 'replace');
+      _snack('Готово: наборов ${r.sets}, слов ${r.words}, прогресса ${r.progress}');
+    } catch (e) {
+      _snack('Не удалось восстановить: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
   String? _updateText;
   UpdateInfo? _updateInfo;
 
@@ -317,6 +431,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           _section('Данные'),
+          Text(
+            _lastBackup == null
+                ? 'Резервная копия ещё не делалась.'
+                : 'Последняя копия: ${formatBackupDate(_lastBackup!)}',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'В копию входят все наборы, слова, уровни и статистика. При '
+            'переустановке приложения без копии всё будет потеряно.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _busy ? null : _backup,
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Сохранить копию'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _restore,
+                icon: const Icon(Icons.download),
+                label: const Text('Восстановить'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerLeft,
             child: OutlinedButton.icon(
