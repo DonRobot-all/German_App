@@ -20,6 +20,24 @@ extension PosLabel on Pos {
 
 const List<String> kArticles = ['der', 'die', 'das'];
 
+/// «Аспекты» слова: отдельные навыки, у каждого свой уровень и свой срок
+/// повторения. Хранятся в word_progress вместе с 'ru_de' и 'de_ru'.
+const String kAspectArticle = 'article';
+const String kAspectForms = 'forms';
+const String kAspectPrep = 'prep';
+
+String aspectLabel(String aspect) {
+  switch (aspect) {
+    case kAspectArticle:
+      return 'артикль';
+    case kAspectForms:
+      return 'формы глагола';
+    case kAspectPrep:
+      return 'предлог';
+  }
+  return aspect;
+}
+
 /// Падежи после предлога у глаголов с управлением.
 const List<String> kCases = ['Akk', 'Dat'];
 
@@ -136,6 +154,15 @@ class Word {
     final parts = german.trim().split(RegExp(r'\s+'));
     return parts.sublist(0, parts.length - 1).join(' ');
   }
+
+  /// Какие дополнительные навыки можно тренировать на этом слове.
+  List<String> get aspects => [
+        if (pos == Pos.noun && article != null) kAspectArticle,
+        if (pos == Pos.verb &&
+            (present3 != null || preterite != null || perfect != null))
+          kAspectForms,
+        if (prep != null) kAspectPrep,
+      ];
 
   String? get prepLine =>
       (prep != null && prepCase != null) ? 'управление: $prep + $prepCase.' : null;

@@ -8,10 +8,9 @@ import '../models.dart';
 import '../settings.dart';
 import '../study.dart';
 import '../tts.dart';
-import 'article_screen.dart';
+import 'aspect_screen.dart';
+import 'aspect_widgets.dart';
 import 'match_screen.dart';
-import 'prep_screen.dart';
-import 'verbforms_screen.dart';
 import 'written_screen.dart';
 
 // ======================================================================
@@ -118,16 +117,21 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
     return l;
   }
 
-  void _startArticles() =>
-      _push(ArticleScreen(words: _limited(articleWords(widget.words))));
+  void _startArticles() => _push(AspectScreen(
+        aspect: kAspectArticle,
+        words: _limited(articleWords(widget.words)),
+      ));
 
-  void _startVerbs() => _push(VerbFormsScreen(
+  void _startVerbs() => _push(AspectScreen(
+        aspect: kAspectForms,
         words: _limited(verbFormWords(widget.words)),
         soft: _soft,
       ));
 
-  void _startPreps() =>
-      _push(PrepScreen(words: _limited(prepVerbWords(widget.words))));
+  void _startPreps() => _push(AspectScreen(
+        aspect: kAspectPrep,
+        words: _limited(prepVerbWords(widget.words)),
+      ));
 
   void _startMatch() => _push(MatchScreen(words: _session()));
 

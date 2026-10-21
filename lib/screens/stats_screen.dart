@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../db.dart';
+import '../models.dart';
 import '../stats.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -73,6 +74,48 @@ class _StatsScreenState extends State<StatsScreen> {
         children: [
           Expanded(child: Text(k)),
           Text('$v', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  String _aspectTitle(String aspect) {
+    switch (aspect) {
+      case kAspectArticle:
+        return 'Артикли';
+      case kAspectForms:
+        return 'Формы глаголов';
+      case kAspectPrep:
+        return 'Глаголы с предлогами';
+    }
+    return aspect;
+  }
+
+  Widget _aspectRow(BuildContext context, AspectStat a) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _aspectTitle(a.aspect),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              minHeight: 8,
+              value: a.total == 0 ? 0 : a.mastered / a.total,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'слов: ${a.total}, начато: ${a.started}, '
+            'освоено: ${a.mastered}, ошибок: ${a.errors}',
+            style: theme.textTheme.bodySmall,
+          ),
         ],
       ),
     );
@@ -157,6 +200,16 @@ class _StatsScreenState extends State<StatsScreen> {
                     ),
                   ],
                 ),
+                if (d.answersToday > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, left: 4),
+                    child: Text(
+                      'Сегодня: ${d.answersToday} ответов, '
+                      'верных ${d.correctToday}, '
+                      'ошибок ${d.answersToday - d.correctToday}.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                 _section(context, 'Слова'),
                 _kv(context, 'Всего', d.totalWords),
                 _kv(context, 'Новые (ещё не изучались)', d.newWords),
@@ -170,6 +223,10 @@ class _StatsScreenState extends State<StatsScreen> {
                 ),
                 _section(context, 'Слова по уровням (направления)'),
                 _levels(context, d),
+                if (d.aspects.isNotEmpty) ...[
+                  _section(context, 'Грамматические навыки'),
+                  for (final a in d.aspects) _aspectRow(context, a),
+                ],
                 _section(context, 'Больше всего ошибок'),
                 if (d.problems.isEmpty)
                   const Text('Ошибок пока нет.')
@@ -181,7 +238,13 @@ class _StatsScreenState extends State<StatsScreen> {
                         p.word.title,
                         style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                      subtitle: Text(p.word.translations.join('; ')),
+                      subtitle: Text(
+                        p.detail == null
+                            ? p.word.translations.join('; ')
+                            : '${p.word.translations.join('; ')}\n'
+                                'Ошибки: ${p.detail}',
+                      ),
+                      isThreeLine: p.detail != null,
                       trailing: Text('ошибок: ${p.errors}'),
                     ),
               ],

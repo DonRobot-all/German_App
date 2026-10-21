@@ -9,9 +9,10 @@ import '../models.dart';
 import '../srs.dart';
 import '../study.dart';
 import '../tts.dart';
+import 'aspect_widgets.dart';
 import 'study_screens.dart';
 
-enum _Format { choice, written }
+enum _Format { choice, written, aspect }
 
 class _Task {
   const _Task({
@@ -63,6 +64,7 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
   final FocusNode _focus = FocusNode();
 
   _Task? _current;
+  bool _aspectAnswered = false;
   int _seq = 0; // номер текущего вопроса (для автоозвучки)
   int _total = 0;
   int _done = 0;
@@ -96,6 +98,10 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
   /// Выбирает формат вопроса: слова с низким уровнем чаще идут с вариантами,
   /// с высоким — письменно. «Давно не писали» всегда письменно.
   _Task _makeTask(ReviewItem item) {
+    // Артикль, формы глагола и предлог: у них свои вопросы.
+    if (item.aspect != null) {
+      return _Task(item: item, format: _Format.aspect);
+    }
     var format = _Format.choice;
     if (widget.pool.length < 2 ||
         item.reason == ReviewReason.stale ||
@@ -122,8 +128,9 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
   /// Вызывается внутри setState.
   void _record(_Task t, bool correct) {
     final w = t.item.word;
-    final key = dirKey(t.item.direction);
-    final written = t.format == _Format.written;
+    final key = t.item.progressDirection;
+    // Навыки (артикль, формы, предлог) оцениваются как полноценный ответ.
+    final written = t.format != _Format.choice;
 
     if (t.isRetry && correct) {
       unawaited(AppDb.instance.touchWritten(w.id, key));
@@ -150,7 +157,8 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
           pos,
           _Task(
             item: t.item,
-            format: _Format.written,
+            format:
+                t.format == _Format.aspect ? _Format.aspect : _Format.written,
             attempts: t.attempts + 1,
           ),
         );
@@ -198,6 +206,7 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
         _seq++;
         _selected = null;
         _result = null;
+        _aspectAnswered = false;
         _controller.clear();
       }
     });
@@ -549,18 +558,41 @@ class _SmartSessionScreenState extends State<SmartSessionScreen> {
     );
   }
 
+  Widget _aspectBody(BuildContext context, _Task t) {
+    return buildAspectQuestion(
+      key: ValueKey<String>('asp-$_seq'),
+      aspect: t.item.aspect!,
+      word: t.item.word,
+      soft: widget.soft,
+      badge: '${_reasonLabel(t)} · ${aspectLabel(t.item.aspect!)}',
+      nextLabel: _queue.isEmpty ? 'Результат' : 'Дальше',
+      onNext: _next,
+      onAnswered: (ok) {
+        if (_aspectAnswered) return;
+        setState(() {
+          _aspectAnswered = true;
+          _record(t, ok);
+        });
+      },
+    );
+  }
+
   Widget _sessionView(BuildContext context, _Task t) {
+    final isAspect = t.format == _Format.aspect;
     return Column(
       children: [
         LinearProgressIndicator(
           value: (_done / _total).clamp(0.0, 1.0).toDouble(),
         ),
         Expanded(
-          child: t.format == _Format.choice
-              ? _choiceBody(context, t)
-              : _writtenBody(context, t),
+          child: isAspect
+              ? _aspectBody(context, t)
+              : t.format == _Format.choice
+                  ? _choiceBody(context, t)
+                  : _writtenBody(context, t),
         ),
-        _bottomBar(t),
+        // У вопросов-навыков своя нижняя панель.
+        if (!isAspect) _bottomBar(t),
       ],
     );
   }

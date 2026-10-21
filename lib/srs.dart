@@ -22,7 +22,8 @@ const int kChoiceMaxLevel = 3;
 
 String progressKey(String wordId, String direction) => '$wordId|$direction';
 
-/// Прогресс по одному слову в одном направлении ('ru_de' или 'de_ru').
+/// Прогресс по одному слову в одном направлении ('ru_de' или 'de_ru')
+/// или по одному навыку ('article', 'forms', 'prep').
 class WordProgress {
   const WordProgress({
     required this.wordId,
@@ -129,12 +130,27 @@ enum ReviewReason {
 }
 
 class ReviewItem {
-  const ReviewItem(this.word, this.direction, this.reason, this.level);
+  const ReviewItem(
+    this.word,
+    this.direction,
+    this.reason,
+    this.level, {
+    this.aspect,
+  });
 
   final Word word;
+
+  /// Направление перевода. Для заданий-«аспектов» не используется.
   final QuestionDirection direction;
   final ReviewReason reason;
   final int level;
+
+  /// null: обычный перевод слова. Иначе kAspectArticle / kAspectForms /
+  /// kAspectPrep: отдельный навык этого слова.
+  final String? aspect;
+
+  /// Ключ в word_progress: 'ru_de', 'de_ru' или имя аспекта.
+  String get progressDirection => aspect ?? dirKey(direction);
 }
 
 class ReviewPlan {
@@ -195,6 +211,47 @@ ReviewPlan buildPlan({
   final freshNew = <ReviewItem>[]; // DE→RU для совсем новых слов
   DateTime? nextDue;
 
+  /// Раскладывает уже начатое задание по спискам: ошибка, просрочено или
+  /// «давно не писали». Для будущих сроков запоминает ближайший.
+  void existing(
+    WordProgress p,
+    ReviewItem Function(ReviewReason reason, int level) make,
+  ) {
+    final due = p.nextDue;
+    if (due == null || !due.isAfter(now)) {
+      final overdueMs = due == null ? 0 : now.difference(due).inMilliseconds;
+      if (p.level == 0) {
+        relearn.add(_Cand(make(ReviewReason.relearn, p.level), overdueMs));
+      } else {
+        overdue.add(_Cand(make(ReviewReason.overdue, p.level), overdueMs));
+      }
+      return;
+    }
+
+    final soonest = nextDue;
+    if (soonest == null || due.isBefore(soonest)) nextDue = due;
+
+    // Срок по лестнице ещё не пришёл, но письменно слово давно не писали.
+    if (p.level >= 1) {
+      final lw = p.lastWritten;
+      final bool isStale;
+      final int age;
+      if (lw == null) {
+        // Письменно ещё ни разу: проверяем письмом, как только слово
+        // перешло на уровень 2 одними вариантами ответа.
+        isStale = p.level >= 2;
+        age = p.lastSeen == null ? 0 : now.difference(p.lastSeen!).inMinutes;
+      } else {
+        final d = now.difference(lw);
+        isStale = d > Duration(days: staleDays);
+        age = d.inMinutes;
+      }
+      if (isStale) {
+        stale.add(_Cand(make(ReviewReason.stale, p.level), age));
+      }
+    }
+  }
+
   for (final w in words) {
     final pDeRu = progress[progressKey(w.id, 'de_ru')];
     final pRuDe = progress[progressKey(w.id, 'ru_de')];
@@ -213,47 +270,21 @@ ReviewPlan buildPlan({
         }
         continue;
       }
+      existing(p, (r, lv) => ReviewItem(w, dir, r, lv));
+    }
 
-      final due = p.nextDue;
-      if (due == null || !due.isAfter(now)) {
-        final overdueMs = due == null ? 0 : now.difference(due).inMilliseconds;
-        if (p.level == 0) {
-          relearn.add(_Cand(
-            ReviewItem(w, dir, ReviewReason.relearn, p.level),
-            overdueMs,
-          ));
-        } else {
-          overdue.add(_Cand(
-            ReviewItem(w, dir, ReviewReason.overdue, p.level),
-            overdueMs,
-          ));
+    // Артикль, формы глагола, предлог: отдельные навыки со своими уровнями.
+    // Начинаем их, когда само слово уже хотя бы раз пройдено верно.
+    for (final asp in w.aspects) {
+      final pa = progress[progressKey(w.id, asp)];
+      ReviewItem make(ReviewReason r, int lv) =>
+          ReviewItem(w, QuestionDirection.deToRu, r, lv, aspect: asp);
+      if (pa == null) {
+        if (pDeRu != null && pDeRu.level >= 1) {
+          freshFollow.add(make(ReviewReason.fresh, 0));
         }
-        continue;
-      }
-
-      if (nextDue == null || due.isBefore(nextDue)) nextDue = due;
-
-      // Срок по лестнице ещё не пришёл, но письменно слово давно не писали.
-      if (p.level >= 1) {
-        final lw = p.lastWritten;
-        final bool isStale;
-        int age;
-        if (lw == null) {
-          // Письменно ещё ни разу: проверяем письмом, как только слово
-          // перешло на уровень 2 одними вариантами ответа.
-          isStale = p.level >= 2;
-          age = p.lastSeen == null ? 0 : now.difference(p.lastSeen!).inMinutes;
-        } else {
-          final d = now.difference(lw);
-          isStale = d > Duration(days: staleDays);
-          age = d.inMinutes;
-        }
-        if (isStale) {
-          stale.add(_Cand(
-            ReviewItem(w, dir, ReviewReason.stale, p.level),
-            age,
-          ));
-        }
+      } else {
+        existing(pa, make);
       }
     }
   }

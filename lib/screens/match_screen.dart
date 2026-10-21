@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import '../db.dart';
 import '../models.dart';
 import '../study.dart';
 import 'study_screens.dart';
@@ -44,6 +45,7 @@ class _MatchScreenState extends State<MatchScreen> {
   final Set<String> _weakIds = {};
   final List<Word> _weak = [];
   late List<Word> _source;
+  final Set<String> _roundWrong = {}; // слова, в которых ошиблись в этом раунде
 
   _Tile? _selected;
   bool _selectedIsLeft = true;
@@ -99,6 +101,7 @@ class _MatchScreenState extends State<MatchScreen> {
     final words = _rounds[_round];
     _left = [for (final w in words) _Tile(w, w.title)];
     _right = [for (final w in words) _Tile(w, russianShort(w))]..shuffle(_rnd);
+    _roundWrong.clear();
     _selected = null;
     _flashA = null;
     _flashB = null;
@@ -134,6 +137,7 @@ class _MatchScreenState extends State<MatchScreen> {
     }
     // Ошибка.
     _mistakes++;
+    _roundWrong..add(sel.word.id)..add(tile.word.id);
     if (_weakIds.add(sel.word.id)) _weak.add(sel.word);
     if (_weakIds.add(tile.word.id)) _weak.add(tile.word);
     setState(() {
@@ -152,6 +156,15 @@ class _MatchScreenState extends State<MatchScreen> {
   }
 
   void _roundDone() {
+    // Каждое слово раунда: верно, если не путали его ни с чем (узнавание DE→RU).
+    for (final w in _rounds[_round]) {
+      unawaited(AppDb.instance.recordAnswer(
+        w.id,
+        'de_ru',
+        correct: !_roundWrong.contains(w.id),
+        written: false,
+      ));
+    }
     if (_round + 1 >= _rounds.length) {
       _watch.stop();
       _ticker?.cancel();

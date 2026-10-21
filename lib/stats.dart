@@ -10,9 +10,35 @@ class AnswerLogEntry {
 }
 
 class ProblemWord {
-  const ProblemWord(this.word, this.errors);
+  const ProblemWord(this.word, this.errors, [this.detail]);
 
   final Word word;
+  final int errors;
+
+  /// Где именно ошибки, например «артикль 2 · предлог 1» (если не только перевод).
+  final String? detail;
+}
+
+/// Итог по одному навыку: артикли, формы глаголов или предлоги.
+class AspectStat {
+  const AspectStat({
+    required this.aspect,
+    required this.total,
+    required this.started,
+    required this.mastered,
+    required this.errors,
+  });
+
+  final String aspect;
+
+  /// Сколько слов подходят для этого навыка.
+  final int total;
+
+  /// По скольким уже были ответы.
+  final int started;
+
+  /// Дошли до последнего уровня.
+  final int mastered;
   final int errors;
 }
 
@@ -30,6 +56,8 @@ class StatsData {
     required this.correctWeek,
     required this.last14,
     required this.totalAnswers,
+    required this.correctToday,
+    required this.aspects,
   });
 
   final int totalWords;
@@ -58,6 +86,10 @@ class StatsData {
   /// Число ответов по дням, последние 14 дней (последний элемент — сегодня).
   final List<int> last14;
   final int totalAnswers;
+  final int correctToday;
+
+  /// Навыки, для которых в наборах есть подходящие слова.
+  final List<AspectStat> aspects;
 }
 
 int dayKey(DateTime t) => t.year * 10000 + t.month * 100 + t.day;
@@ -73,6 +105,10 @@ StatsData buildStats({
   var learned = 0;
   final levelCounts = List<int>.filled(kMaxLevel + 1, 0);
   final problems = <ProblemWord>[];
+  final aspectTotals = <String, int>{};
+  final aspectStarted = <String, int>{};
+  final aspectMastered = <String, int>{};
+  final aspectErrors = <String, int>{};
 
   for (final w in words) {
     final pDe = progress[progressKey(w.id, 'de_ru')];
@@ -93,8 +129,27 @@ StatsData buildStats({
     } else {
       learning++;
     }
-    final errors = (pDe?.errors ?? 0) + (pRu?.errors ?? 0);
-    if (errors > 0) problems.add(ProblemWord(w, errors));
+    var errors = (pDe?.errors ?? 0) + (pRu?.errors ?? 0);
+    final parts = <String>[];
+    for (final asp in w.aspects) {
+      aspectTotals[asp] = (aspectTotals[asp] ?? 0) + 1;
+      final pa = progress[progressKey(w.id, asp)];
+      if (pa == null) continue;
+      aspectStarted[asp] = (aspectStarted[asp] ?? 0) + 1;
+      if (pa.level >= kMaxLevel) {
+        aspectMastered[asp] = (aspectMastered[asp] ?? 0) + 1;
+      }
+      if (pa.errors > 0) {
+        aspectErrors[asp] = (aspectErrors[asp] ?? 0) + pa.errors;
+        errors += pa.errors;
+        parts.add('${aspectLabel(asp)} ${pa.errors}');
+      }
+    }
+    if (errors > 0) {
+      problems.add(
+        ProblemWord(w, errors, parts.isEmpty ? null : parts.join(' · ')),
+      );
+    }
   }
   problems.sort((a, b) => b.errors.compareTo(a.errors));
 
@@ -124,7 +179,9 @@ StatsData buildStats({
   final weekStart = DateTime(today.year, today.month, today.day - 6);
   var answersWeek = 0;
   var correctWeek = 0;
+  var correctToday = 0;
   for (final e in log) {
+    if (e.correct && dayKey(e.time) == dayKey(today)) correctToday++;
     if (!e.time.isBefore(weekStart)) {
       answersWeek++;
       if (e.correct) correctWeek++;
@@ -144,5 +201,17 @@ StatsData buildStats({
     correctWeek: correctWeek,
     last14: last14,
     totalAnswers: log.length,
+    correctToday: correctToday,
+    aspects: [
+      for (final asp in [kAspectArticle, kAspectForms, kAspectPrep])
+        if ((aspectTotals[asp] ?? 0) > 0)
+          AspectStat(
+            aspect: asp,
+            total: aspectTotals[asp] ?? 0,
+            started: aspectStarted[asp] ?? 0,
+            mastered: aspectMastered[asp] ?? 0,
+            errors: aspectErrors[asp] ?? 0,
+          ),
+    ],
   );
 }
