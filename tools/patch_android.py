@@ -201,7 +201,73 @@ def patch_signing(candidates=GRADLE_FILES, keystore=KEYSTORE):
     print('%s: релиз подписывается ключом %s' % (path, keystore))
 
 
+ROOT_GRADLE_FILES = ('android/build.gradle.kts', 'android/build.gradle')
+COMPILE_SDK = 36
+COMPILE_SDK_MARK = 'german_words: compileSdk'
+
+KTS_COMPILE_SDK = """// german_words: compileSdk. Некоторые плагины собраны с более старым Android API,
+// чем требуют их зависимости. Поднимаем версию для компиляции у всех модулей.
+subprojects {
+    val bumpCompileSdk = { p: Project ->
+        val ext = p.extensions.findByName("android")
+        if (ext != null) {
+            try {
+                ext.withGroovyBuilder { "compileSdkVersion"(%(sdk)d) }
+            } catch (e: Exception) {
+            }
+        }
+    }
+    if (state.executed) bumpCompileSdk(this) else afterEvaluate { bumpCompileSdk(this) }
+}
+
+"""
+
+GROOVY_COMPILE_SDK = """// german_words: compileSdk. Некоторые плагины собраны с более старым Android API,
+// чем требуют их зависимости. Поднимаем версию для компиляции у всех модулей.
+subprojects { sp ->
+    def bump = { Project p ->
+        if (p.hasProperty('android')) {
+            try {
+                p.android { compileSdkVersion %(sdk)d }
+            } catch (Exception e) {
+            }
+        }
+    }
+    if (sp.state.executed) {
+        bump(sp)
+    } else {
+        sp.afterEvaluate { bump(sp) }
+    }
+}
+
+"""
+
+
+def patch_compile_sdk(candidates=ROOT_GRADLE_FILES, sdk=COMPILE_SDK):
+    """Поднимает compileSdk у плагинов (иначе, например, file_picker не собирается)."""
+    path = next((p for p in candidates if os.path.exists(p)), None)
+    if path is None:
+        print('Корневой build.gradle не найден, compileSdk не меняю')
+        return
+    with open(path, encoding='utf-8') as f:
+        t = f.read()
+    if COMPILE_SDK_MARK in t:
+        print('%s: compileSdk уже поднят' % path)
+        return
+    block = (KTS_COMPILE_SDK if path.endswith('.kts') else GROOVY_COMPILE_SDK) % {'sdk': sdk}
+    # Блок должен стоять до evaluationDependsOn(":app"), иначе :app вычислится раньше.
+    m = re.search(r'^[ \t]*subprojects\s*\{', t, re.M)
+    if m:
+        t = t[:m.start()] + block + t[m.start():]
+    else:
+        t = t.rstrip('\n') + '\n\n' + block
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(t)
+    print('%s: compileSdk поднят до %d' % (path, sdk))
+
+
 if __name__ == '__main__':
     patch_manifest()
     patch_gradle()
     patch_signing()
+    patch_compile_sdk()
