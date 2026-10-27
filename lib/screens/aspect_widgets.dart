@@ -25,6 +25,10 @@ List<Word> verbFormWords(List<Word> words) =>
 List<Word> prepVerbWords(List<Word> words) =>
     [for (final w in words) if (w.aspects.contains(kAspectPrep)) w];
 
+/// Для диктовки подходит любое слово.
+List<Word> dictationWords(List<Word> words) =>
+    [for (final w in words) if (w.german.trim().isNotEmpty) w];
+
 List<Word> wordsForAspect(String aspect, List<Word> words) =>
     [for (final w in words) if (w.aspects.contains(aspect)) w];
 
@@ -637,6 +641,280 @@ class _FormsQuestionState extends State<FormsQuestion> {
   }
 }
 
+// ---------- Диктовка ----------
+
+class DictationQuestion extends StatefulWidget {
+  const DictationQuestion({
+    super.key,
+    required this.word,
+    required this.soft,
+    required this.onAnswered,
+    required this.onNext,
+    required this.nextLabel,
+    this.badge,
+  });
+
+  final Word word;
+
+  /// Мягкая проверка письма.
+  final bool soft;
+  final void Function(bool correct) onAnswered;
+  final VoidCallback onNext;
+  final String nextLabel;
+  final String? badge;
+
+  @override
+  State<DictationQuestion> createState() => _DictationQuestionState();
+}
+
+class _DictationQuestionState extends State<DictationQuestion> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focus = FocusNode();
+  AnswerCheck? _result;
+  bool _showHint = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Слово звучит сразу, как появился вопрос.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Speaker.instance.speak(widget.word.title);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _check({bool giveUp = false}) {
+    if (_result != null) return;
+    final AnswerCheck res;
+    if (giveUp) {
+      res = const AnswerCheck(false);
+    } else {
+      if (_controller.text.trim().isEmpty) return;
+      res = checkGerman(widget.word, _controller.text, soft: widget.soft);
+    }
+    FocusScope.of(context).unfocus();
+    setState(() => _result = res);
+    widget.onAnswered(res.accepted);
+  }
+
+  void _insertChar(String ch) {
+    final text = _controller.text;
+    final sel = _controller.selection;
+    final start = sel.isValid ? sel.start : text.length;
+    final end = sel.isValid ? sel.end : text.length;
+    _controller.value = TextEditingValue(
+      text: text.replaceRange(start, end, ch),
+      selection: TextSelection.collapsed(offset: start + ch.length),
+    );
+  }
+
+  Widget _charRow() {
+    const chars = ['ä', 'ö', 'ü', 'ß', 'Ä', 'Ö', 'Ü'];
+    return ExcludeFocus(
+      child: Material(
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Row(
+            children: [
+              for (final ch in chars)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 44),
+                      ),
+                      onPressed: () => _insertChar(ch),
+                      child: Text(ch, style: const TextStyle(fontSize: 18)),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final w = widget.word;
+    final res = _result;
+    final answered = res != null;
+    final accepted = res?.accepted ?? false;
+    final note = res?.note;
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      if (widget.badge != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Chip(
+                            label: Text(widget.badge!),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ),
+                      Text(
+                        'Послушайте и напишите по-немецки',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () => Speaker.instance.speak(w.title),
+                            icon: const Icon(Icons.volume_up),
+                            label: const Text('Повторить'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => Speaker.instance
+                                .speak(w.title, rateFactor: 0.6),
+                            icon: const Icon(Icons.slow_motion_video),
+                            label: const Text('Медленно'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (_showHint || answered)
+                        Text(
+                          russianFull(w),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyLarge,
+                        )
+                      else
+                        TextButton(
+                          onPressed: () => setState(() => _showHint = true),
+                          child: const Text('Показать перевод'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _controller,
+                focusNode: _focus,
+                autofocus: true,
+                readOnly: answered,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _check(),
+                style: const TextStyle(fontSize: 20),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: 'Ответ по-немецки',
+                  helperText: w.pos == Pos.noun
+                      ? 'Существительное пишите с артиклем: der / die / das'
+                      : null,
+                  filled: answered,
+                  fillColor: answered
+                      ? (accepted
+                          ? Colors.green.withAlpha(45)
+                          : Colors.red.withAlpha(45))
+                      : null,
+                ),
+              ),
+              if (answered) ...[
+                const SizedBox(height: 12),
+                _Verdict(ok: accepted),
+                if (note != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(note, textAlign: TextAlign.center),
+                  ),
+                const SizedBox(height: 8),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Правильный ответ',
+                              style: theme.textTheme.bodySmall),
+                          const SizedBox(height: 2),
+                          Text(
+                            w.title,
+                            style: theme.textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          if (w.pluralLine != null) Text(w.pluralLine!),
+                          if (w.verbFormsLine != null) Text(w.verbFormsLine!),
+                          if (w.prepLine != null) Text(w.prepLine!),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!answered) _charRow(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: answered
+                    ? SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: widget.onNext,
+                          child: Text(widget.nextLabel),
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => _check(giveUp: true),
+                              child: const Text('Не знаю'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: FilledButton(
+                              onPressed: _check,
+                              child: const Text('Проверить'),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Вопрос нужного вида для [aspect].
 Widget buildAspectQuestion({
   required String aspect,
@@ -653,6 +931,16 @@ Widget buildAspectQuestion({
       return ArticleQuestion(
         key: key,
         word: word,
+        onAnswered: onAnswered,
+        onNext: onNext,
+        nextLabel: nextLabel,
+        badge: badge,
+      );
+    case kAspectDictation:
+      return DictationQuestion(
+        key: key,
+        word: word,
+        soft: soft,
         onAnswered: onAnswered,
         onNext: onNext,
         nextLabel: nextLabel,

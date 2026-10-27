@@ -22,11 +22,15 @@ class Speaker {
     }
   }
 
-  Future<void> speak(String text) async {
+  /// [rateFactor] < 1 замедляет речь (например, 0.6 для «медленно»).
+  Future<void> speak(String text, {double rateFactor = 1.0}) async {
     await _init();
     if (!_ready) return;
     try {
-      await _tts.setSpeechRate(AppSettings.instance.speechRate);
+      final rate = (AppSettings.instance.speechRate * rateFactor)
+          .clamp(0.1, 1.0)
+          .toDouble();
+      await _tts.setSpeechRate(rate);
       await _tts.stop();
       await _tts.speak(text);
     } catch (_) {

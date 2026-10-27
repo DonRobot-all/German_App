@@ -24,6 +24,8 @@ PERMISSIONS = (
     'android.permission.INTERNET',
     'android.permission.POST_NOTIFICATIONS',
     'android.permission.RECEIVE_BOOT_COMPLETED',
+    # Точное время уведомлений (пользователь разрешает в настройках Android).
+    'android.permission.SCHEDULE_EXACT_ALARM',
 )
 
 RECEIVERS = (

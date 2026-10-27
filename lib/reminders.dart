@@ -21,6 +21,101 @@ class Reminders {
       FlutterLocalNotificationsPlugin();
   bool _inited = false;
 
+  /// Последняя ошибка (для диагностики в настройках).
+  String? lastError;
+
+  static const NotificationDetails _details = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'daily_review',
+      'Ежедневное напоминание',
+      channelDescription: 'Напоминание о повторении слов',
+      importance: Importance.high,
+      priority: Priority.high,
+    ),
+  );
+
+  AndroidFlutterLocalNotificationsPlugin? get _android =>
+      _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+
+  /// Можно ли ставить точные будильники (нужно для уведомлений ровно в срок).
+  Future<bool> canScheduleExact() async {
+    if (!await _init()) return false;
+    try {
+      return await _android?.canScheduleExactNotifications() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Открывает системный экран «Будильники и напоминания».
+  Future<void> requestExact() async {
+    if (!await _init()) return;
+    try {
+      await _android?.requestExactAlarmsPermission();
+    } catch (e) {
+      lastError = '$e';
+    }
+  }
+
+  Future<bool> notificationsEnabled() async {
+    if (!await _init()) return false;
+    try {
+      return await _android?.areNotificationsEnabled() ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<int> pendingCount() async {
+    if (!await _init()) return -1;
+    try {
+      return (await _plugin.pendingNotificationRequests()).length;
+    } catch (e) {
+      lastError = '$e';
+      return -1;
+    }
+  }
+
+  /// Показывает уведомление сразу. Возвращает null, если всё хорошо,
+  /// иначе текст ошибки.
+  Future<String?> showNow() async {
+    if (!await _init()) return 'Не удалось инициализировать: $lastError';
+    try {
+      await _plugin.show(
+          900, 'Немецкие слова', 'Проверка: уведомления работают.', _details);
+      return null;
+    } catch (e) {
+      lastError = '$e';
+      return '$e';
+    }
+  }
+
+  /// Ставит тестовое уведомление через [seconds] секунд.
+  Future<String?> scheduleTest({int seconds = 60}) async {
+    if (!await _init()) return 'Не удалось инициализировать: $lastError';
+    try {
+      final exact = await canScheduleExact();
+      await _plugin.zonedSchedule(
+        901,
+        'Немецкие слова',
+        'Проверка: запланированное уведомление пришло.',
+        tz.TZDateTime.from(
+            DateTime.now().add(Duration(seconds: seconds)), tz.UTC),
+        _details,
+        androidScheduleMode: exact
+            ? AndroidScheduleMode.exactAllowWhileIdle
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      return null;
+    } catch (e) {
+      lastError = '$e';
+      return '$e';
+    }
+  }
+
   Future<bool> _init() async {
     if (_inited) return true;
     try {
@@ -31,7 +126,8 @@ class Reminders {
       await _plugin.initialize(settings);
       _inited = true;
       return true;
-    } catch (_) {
+    } catch (e) {
+      lastError = '$e';
       return false;
     }
   }
@@ -70,6 +166,7 @@ class Reminders {
     if (!await _init()) return;
     try {
       await _plugin.cancelAll();
+      final exact = await canScheduleExact();
       final now = DateTime.now();
       final hour = s.reminderMinutes ~/ 60;
       final minute = s.reminderMinutes % 60;
@@ -87,22 +184,18 @@ class Reminders {
           'Немецкие слова',
           body,
           tz.TZDateTime.from(local, tz.UTC),
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              'daily_review',
-              'Ежедневное напоминание',
-              channelDescription: 'Напоминание о повторении слов',
-              importance: Importance.defaultImportance,
-              priority: Priority.defaultPriority,
-            ),
-          ),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          _details,
+          androidScheduleMode: exact
+              ? AndroidScheduleMode.exactAllowWhileIdle
+              : AndroidScheduleMode.inexactAllowWhileIdle,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
         );
       }
-    } catch (_) {
+      lastError = null;
+    } catch (e) {
       // Уведомления — дополнительная функция, ошибка не должна ломать приложение.
+      lastError = '$e';
     }
   }
 }

@@ -18,11 +18,11 @@ class AspectScreen extends StatefulWidget {
     this.soft = false,
   });
 
-  /// kAspectArticle, kAspectForms или kAspectPrep.
+  /// kAspectArticle, kAspectForms, kAspectPrep или kAspectDictation.
   final String aspect;
   final List<Word> words;
 
-  /// Мягкая проверка (только для форм глаголов).
+  /// Мягкая проверка (для форм глаголов и диктовки).
   final bool soft;
 
   @override
@@ -60,6 +60,8 @@ class _AspectScreenState extends State<AspectScreen> {
         return 'Артикли';
       case kAspectPrep:
         return 'Глаголы с предлогами';
+      case kAspectDictation:
+        return widget.soft ? 'Диктовка (мягко)' : 'Диктовка';
       default:
         return widget.soft ? 'Формы глаголов (мягко)' : 'Формы глаголов';
     }
@@ -71,6 +73,8 @@ class _AspectScreenState extends State<AspectScreen> {
         return 'артиклей угадано';
       case kAspectPrep:
         return 'глаголов с предлогом угадано';
+      case kAspectDictation:
+        return 'слов записано верно';
       default:
         return 'глаголов без ошибок во всех формах';
     }

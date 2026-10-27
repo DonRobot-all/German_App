@@ -133,6 +133,12 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
         words: _limited(prepVerbWords(widget.words)),
       ));
 
+  void _startDictation() => _push(AspectScreen(
+        aspect: kAspectDictation,
+        words: _limited(dictationWords(widget.words)),
+        soft: _soft,
+      ));
+
   void _startMatch() => _push(MatchScreen(words: _session()));
 
   @override
@@ -229,6 +235,12 @@ class _StudySetupSheetState extends State<_StudySetupSheet> {
               onPressed: nVerbs > 0 ? _startVerbs : null,
               icon: const Icon(Icons.swap_horiz),
               label: Text('Формы глаголов (глаголов: $nVerbs)'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: widget.words.isNotEmpty ? _startDictation : null,
+              icon: const Icon(Icons.hearing),
+              label: const Text('Диктовка (на слух)'),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(

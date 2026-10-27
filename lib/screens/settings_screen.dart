@@ -226,6 +226,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _reminderDiagnostics() async {
+    final r = Reminders.instance;
+    final enabled = await r.notificationsEnabled();
+    final exact = await r.canScheduleExact();
+    final pending = await r.pendingCount();
+    final shown = await r.showNow();
+    final sched = await r.scheduleTest(seconds: 60);
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Проверка уведомлений'),
+        content: SingleChildScrollView(
+          child: Text(
+            'Уведомления разрешены: ${enabled ? 'да' : 'НЕТ'}\n'
+            'Точные будильники разрешены: ${exact ? 'да' : 'нет'}\n'
+            'Запланировано сейчас: $pending\n'
+            'Показ сразу: ${shown ?? 'должно было появиться'}\n'
+            'Через минуту: ${sched ?? 'поставлено, ждите ~1 мин'}\n\n'
+            'Если сразу ничего не появилось — уведомления выключены в '
+            'системе. Если пришло только сразу, а через минуту нет — '
+            'выключите экономию батареи для приложения и разрешите '
+            '«Будильники и напоминания».',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Reminders.instance.requestExact();
+              Navigator.pop(ctx);
+            },
+            child: const Text('Разрешить точное время'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickReminderTime() async {
     final t = await showTimePicker(
       context: context,
@@ -390,6 +432,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: theme.textTheme.titleMedium,
               ),
               onTap: _pickReminderTime,
+            ),
+          if (_s.reminderEnabled)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _reminderDiagnostics,
+                icon: const Icon(Icons.notifications_active),
+                label: const Text('Проверить уведомления'),
+              ),
             ),
           if (_s.reminderEnabled)
             Text(

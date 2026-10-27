@@ -26,6 +26,10 @@ const String kAspectArticle = 'article';
 const String kAspectForms = 'forms';
 const String kAspectPrep = 'prep';
 
+/// Диктовка: слово на слух. Это отдельная тренировка, в умное повторение
+/// не входит (поэтому её нет в Word.aspects), но ответы идут в журнал.
+const String kAspectDictation = 'dictation';
+
 String aspectLabel(String aspect) {
   switch (aspect) {
     case kAspectArticle:
@@ -34,6 +38,8 @@ String aspectLabel(String aspect) {
       return 'формы глагола';
     case kAspectPrep:
       return 'предлог';
+    case kAspectDictation:
+      return 'диктовка';
   }
   return aspect;
 }
