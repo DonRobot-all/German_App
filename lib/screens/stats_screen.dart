@@ -2,8 +2,12 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'package:share_plus/share_plus.dart';
+
 import '../db.dart';
 import '../models.dart';
+import '../report.dart';
+import '../settings.dart';
 import '../stats.dart';
 
 class StatsScreen extends StatefulWidget {
@@ -26,6 +30,15 @@ class _StatsScreenState extends State<StatsScreen> {
     final d = await AppDb.instance.loadStats();
     if (!mounted) return;
     setState(() => _data = d);
+  }
+
+  void _openReport() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _ReportSheet(),
+    );
   }
 
   Widget _section(BuildContext context, String title) {
@@ -173,7 +186,16 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget build(BuildContext context) {
     final d = _data;
     return Scaffold(
-      appBar: AppBar(title: const Text('Статистика')),
+      appBar: AppBar(
+        title: const Text('Статистика'),
+        actions: [
+          IconButton(
+            tooltip: 'Отчёт преподавателю',
+            icon: const Icon(Icons.ios_share),
+            onPressed: _openReport,
+          ),
+        ],
+      ),
       body: d == null
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -249,6 +271,120 @@ class _StatsScreenState extends State<StatsScreen> {
                     ),
               ],
             ),
+    );
+  }
+}
+
+/// Окно «Отчёт преподавателю»: период, имя, текст и кнопка «Отправить».
+class _ReportSheet extends StatefulWidget {
+  const _ReportSheet();
+
+  @override
+  State<_ReportSheet> createState() => _ReportSheetState();
+}
+
+class _ReportSheetState extends State<_ReportSheet> {
+  int _days = 1;
+  String _text = '';
+  bool _loading = true;
+  late final TextEditingController _name =
+      TextEditingController(text: AppSettings.instance.studentName);
+
+  @override
+  void initState() {
+    super.initState();
+    _build();
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _build() async {
+    setState(() => _loading = true);
+    String text;
+    try {
+      text = await buildProgressReport(days: _days, name: _name.text);
+    } catch (e) {
+      text = 'Не удалось собрать отчёт: $e';
+    }
+    if (!mounted) return;
+    setState(() {
+      _text = text;
+      _loading = false;
+    });
+  }
+
+  Future<void> _send() async {
+    final name = _name.text.trim();
+    AppSettings.instance.update(() => AppSettings.instance.studentName = name);
+    try {
+      await Share.share(_text, subject: 'Отчёт об изучении немецкого');
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Отчёт преподавателю',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<int>(
+              segments: const [
+                ButtonSegment(value: 1, label: Text('Сегодня')),
+                ButtonSegment(value: 7, label: Text('7 дней')),
+                ButtonSegment(value: 30, label: Text('30 дней')),
+              ],
+              selected: {_days},
+              onSelectionChanged: (s) {
+                _days = s.first;
+                _build();
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Ваше имя (необязательно)',
+              ),
+              onChanged: (_) => _build(),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Theme.of(context).dividerColor),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SelectableText(_text),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _loading ? null : _send,
+                icon: const Icon(Icons.send),
+                label: const Text('Отправить'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

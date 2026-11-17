@@ -203,6 +203,47 @@ def patch_signing(candidates=GRADLE_FILES, keystore=KEYSTORE):
     print('%s: релиз подписывается ключом %s' % (path, keystore))
 
 
+PROGUARD_RULES = '''# german_words: flutter_local_notifications читает сохранённые уведомления через
+# Gson. R8 вырезает у TypeToken сведения о типах, и планирование падает с
+# "Missing type parameter". Эти правила его сохраняют.
+-keep class com.dexterous.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class * extends com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
+'''
+
+
+def patch_proguard(candidates=GRADLE_FILES, rules='android/app/proguard-rules.pro'):
+    """Правила R8 для flutter_local_notifications (иначе напоминания не ставятся)."""
+    path = next((p for p in candidates if os.path.exists(p)), None)
+    if path is None:
+        sys.exit('build.gradle(.kts) приложения не найден')
+    with open(rules, 'w', encoding='utf-8') as f:
+        f.write(PROGUARD_RULES)
+    with open(path, encoding='utf-8') as f:
+        t = f.read()
+    if 'proguard-rules.pro' in t:
+        print('%s: правила R8 уже подключены' % path)
+        return
+    if path.endswith('.kts'):
+        line = 'proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")'
+    else:
+        line = "proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'"
+    t, n = re.subn(
+        r'(buildTypes\s*\{\s*(?:getByName\("release"\)|release)\s*\{)',
+        lambda m: m.group(1) + '\n            ' + line,
+        t,
+        count=1,
+    )
+    if n == 0:
+        sys.exit('%s: не найден блок release { ... } в buildTypes' % path)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(t)
+    print('%s: подключены правила R8' % path)
+
+
 ROOT_GRADLE_FILES = ('android/build.gradle.kts', 'android/build.gradle')
 COMPILE_SDK = 36
 COMPILE_SDK_MARK = 'german_words: compileSdk'
@@ -272,4 +313,5 @@ if __name__ == '__main__':
     patch_manifest()
     patch_gradle()
     patch_signing()
+    patch_proguard()
     patch_compile_sdk()

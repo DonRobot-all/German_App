@@ -32,6 +32,9 @@ class AppSettings extends ChangeNotifier {
   /// Ежедневное напоминание о повторении.
   bool reminderEnabled = false;
 
+  /// Имя ученика для отчёта преподавателю.
+  String studentName = '';
+
   /// Время напоминания: минут от полуночи (по умолчанию 19:00).
   int reminderMinutes = 19 * 60;
 
@@ -52,6 +55,7 @@ class AppSettings extends ChangeNotifier {
       staleDays = p.getInt('staleDays') ?? staleDays;
       reminderEnabled = p.getBool('reminderEnabled') ?? reminderEnabled;
       reminderMinutes = p.getInt('reminderMinutes') ?? reminderMinutes;
+      studentName = p.getString('studentName') ?? studentName;
     } catch (_) {
       // Без сохранённых настроек приложение работает со значениями по умолчанию.
     }
@@ -73,6 +77,7 @@ class AppSettings extends ChangeNotifier {
       await p.setInt('staleDays', staleDays);
       await p.setBool('reminderEnabled', reminderEnabled);
       await p.setInt('reminderMinutes', reminderMinutes);
+      await p.setString('studentName', studentName);
     } catch (_) {}
   }
 }
