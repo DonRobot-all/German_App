@@ -228,9 +228,9 @@ def patch_proguard(candidates=GRADLE_FILES, rules='android/app/proguard-rules.pr
         print('%s: правила R8 уже подключены' % path)
         return
     if path.endswith('.kts'):
-        line = 'proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")'
+        line = 'proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")'
     else:
-        line = "proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'"
+        line = "proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'"
     t, n = re.subn(
         r'(buildTypes\s*\{\s*(?:getByName\("release"\)|release)\s*\{)',
         lambda m: m.group(1) + '\n            ' + line,
